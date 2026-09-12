@@ -1,0 +1,50 @@
+{
+  "armor_hit_1": {
+    "subtitle": "subtitles.jagtaczarmor.armor_hit",
+    "sounds": [
+      "jagtaczarmor:armor/bullet_hit_1"
+    ]
+  },
+  "armor_hit_2": {
+    "subtitle": "subtitles.jagtaczarmor.armor_hit",
+    "sounds": [
+      "jagtaczarmor:armor/bullet_hit_2"
+    ]
+  },
+  "armor_hit_3": {
+    "subtitle": "subtitles.jagtaczarmor.armor_hit",
+    "sounds": [
+      "jagtaczarmor:armor/bullet_hit_3"
+    ]
+  },
+  "armor_hit_4": {
+    "subtitle": "subtitles.jagtaczarmor.armor_hit",
+    "sounds": [
+      "jagtaczarmor:armor/bullet_hit_4"
+    ]
+  },
+  "armor_hit_5": {
+    "subtitle": "subtitles.jagtaczarmor.armor_hit",
+    "sounds": [
+      "jagtaczarmor:armor/bullet_hit_5"
+    ]
+  },
+  "hurt_1": {
+    "sounds": [ "jagtaczarmor:hurt/hurt_1" ]
+  },
+  "hurt_2": {
+    "sounds": [ "jagtaczarmor:hurt/hurt_2" ]
+  },
+  "hurt_3": {
+    "sounds": [ "jagtaczarmor:hurt/hurt_3" ]
+  },
+  "hurt_4": {
+    "sounds": [ "jagtaczarmor:hurt/hurt_4" ]
+  },
+  "hurt_5": {
+    "sounds": [ "jagtaczarmor:hurt/hurt_5" ]
+  },
+  "hurt_6": {
+    "sounds": [ "jagtaczarmor:hurt/hurt_6" ]
+  }
+}

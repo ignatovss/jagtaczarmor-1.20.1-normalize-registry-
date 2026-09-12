@@ -1,0 +1,18 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "animation.idle": {
+      "loop": true,
+      "animation_length": 1.0,
+      "bones": {
+        "armorBody": {
+          "rotation": {
+            "0.0": [0, 0, 0],
+            "0.5": [2.0, 0, 0],
+            "1.0": [0, 0, 0]
+          }
+        }
+      }
+    }
+  }
+}

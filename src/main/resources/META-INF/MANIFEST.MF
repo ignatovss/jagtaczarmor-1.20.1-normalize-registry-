@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Specification-Title: jagtaczarmor
+Specification-Vendor: MT
+Specification-Version: 1
+Implementation-Title: jagtaczarmor
+Implementation-Version: 1.0.9
+Implementation-Vendor: MT
+Implementation-Timestamp: 2026-08-19T19:58:27+0700
+
