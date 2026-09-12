@@ -1,6 +1,7 @@
 package com.jagtaczarmor.registry;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.jagtaczarmor.JagTaczArmor;
@@ -21,17 +22,16 @@ import net.minecraftforge.registries.RegisterEvent;
 import net.minecraftforge.registries.RegistryObject;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -52,15 +52,34 @@ public class ItemRegistry {
 
     private static final Gson GSON = new Gson();
 
+    /**
+     * IDs динамических предметов, уже зарегистрированных через RegisterEvent.
+     */
     private static final Set<ResourceLocation> REGISTERED_DYNAMIC_ITEMS =
             new HashSet<>();
 
+    /**
+     * Совместимость со старым API.
+     *
+     * Здесь находятся RegistryObject для динамических предметов.
+     */
     private static final Map<ResourceLocation, RegistryObject<Item>> ADDON_ITEMS =
-            new java.util.HashMap<>();
+            new HashMap<>();
+
+    /**
+     * Реальные экземпляры CustomGeoArmorItem.
+     *
+     * CreativeTabRegistry использует именно эту коллекцию.
+     */
+    private static final Map<ResourceLocation, CustomGeoArmorItem>
+            ADDON_ITEM_INSTANCES = new HashMap<>();
 
     private ItemRegistry() {
     }
 
+    /**
+     * Регистрация обычных и динамических предметов.
+     */
     @SubscribeEvent
     public static void onItemRegister(RegisterEvent event) {
         if (!event.getRegistryKey().equals(
@@ -72,7 +91,21 @@ public class ItemRegistry {
         registerAddonItems(event);
     }
 
+    /**
+     * Читает items.json из всех паков:
+     *
+     * .minecraft/tacz/<pack>/items.json
+     *
+     * и
+     *
+     * .minecraft/tacz/<pack>.zip -> items.json
+     */
     private static void registerAddonItems(RegisterEvent event) {
+
+        REGISTERED_DYNAMIC_ITEMS.clear();
+        ADDON_ITEMS.clear();
+        ADDON_ITEM_INSTANCES.clear();
+
         Path taczDir = net.minecraftforge.fml.loading.FMLPaths.GAMEDIR
                 .get()
                 .resolve("tacz");
@@ -88,17 +121,30 @@ public class ItemRegistry {
         }
 
         for (File pack : packs) {
+
             if (pack.isDirectory()) {
-                registerDirectoryPack(event, pack.toPath());
+                registerDirectoryPack(
+                        event,
+                        pack.toPath()
+                );
+
             } else if (
                     pack.isFile()
-                            && pack.getName().toLowerCase().endsWith(".zip")
+                            && pack.getName()
+                            .toLowerCase()
+                            .endsWith(".zip")
             ) {
-                registerZipPack(event, pack.toPath());
+                registerZipPack(
+                        event,
+                        pack.toPath()
+                );
             }
         }
     }
 
+    /**
+     * Читает items.json из обычной папки пака.
+     */
     private static void registerDirectoryPack(
             RegisterEvent event,
             Path packPath
@@ -109,10 +155,10 @@ public class ItemRegistry {
             return;
         }
 
-        String namespace = packPath.getFileName().toString();
-
         try (
-                InputStream stream = Files.newInputStream(itemsPath);
+                InputStream stream =
+                        Files.newInputStream(itemsPath);
+
                 InputStreamReader reader =
                         new InputStreamReader(
                                 stream,
@@ -131,7 +177,7 @@ public class ItemRegistry {
             registerArmorGroup(
                     event,
                     root,
-                    namespace
+                    itemsPath.toString()
             );
 
         } catch (IOException | RuntimeException exception) {
@@ -143,18 +189,17 @@ public class ItemRegistry {
         }
     }
 
+    /**
+     * Читает items.json из ZIP-пака.
+     */
     private static void registerZipPack(
             RegisterEvent event,
             Path packPath
     ) {
-        String fileName = packPath.getFileName().toString();
-
-        String namespace = fileName.substring(
-                0,
-                fileName.length() - 4
-        );
-
-        try (ZipFile zipFile = new ZipFile(packPath.toFile())) {
+        try (
+                ZipFile zipFile =
+                        new ZipFile(packPath.toFile())
+        ) {
 
             ZipEntry manifestEntry =
                     zipFile.getEntry("items.json");
@@ -185,7 +230,7 @@ public class ItemRegistry {
                 registerArmorGroup(
                         event,
                         root,
-                        namespace
+                        packPath.toString()
                 );
             }
 
@@ -198,84 +243,147 @@ public class ItemRegistry {
         }
     }
 
+    /**
+     * Новый формат items.json:
+     *
+     * {
+     *   "armor": [
+     *     {
+     *       "item_id": "lrarmor_pack:atf_helmet",
+     *       "armor_id": "lrarmor_pack:atf_helmet",
+     *       "item_type": "armor"
+     *     }
+     *   ]
+     * }
+     */
     private static void registerArmorGroup(
             RegisterEvent event,
             JsonObject root,
-            String namespace
+            String source
     ) {
         if (!root.has("armor")
-                || !root.get("armor").isJsonObject()) {
+                || !root.get("armor").isJsonArray()) {
+
+            JagTaczArmor.LOGGER.warn(
+                    "Invalid or missing 'armor' array in items manifest '{}'.",
+                    source
+            );
+
             return;
         }
 
-        JsonObject armorGroup =
-                root.getAsJsonObject("armor");
+        JsonArray armorArray =
+                root.getAsJsonArray("armor");
 
-        for (Map.Entry<String, JsonElement> entry :
-                armorGroup.entrySet()) {
+        for (JsonElement element : armorArray) {
 
-            String itemName = entry.getKey();
-
-            if (!entry.getValue().isJsonObject()) {
+            if (!element.isJsonObject()) {
                 JagTaczArmor.LOGGER.warn(
-                        "Invalid armor item definition '{}' in pack '{}'.",
-                        itemName,
-                        namespace
+                        "Invalid armor item entry in '{}'.",
+                        source
                 );
                 continue;
             }
 
             JsonObject itemObject =
-                    entry.getValue().getAsJsonObject();
+                    element.getAsJsonObject();
 
             String itemType =
-                    itemObject.has("item_type")
-                            ? itemObject
-                            .get("item_type")
-                            .getAsString()
-                            : "armor";
+                    getString(
+                            itemObject,
+                            "item_type",
+                            "armor"
+                    );
 
             if (!"armor".equals(itemType)) {
                 JagTaczArmor.LOGGER.warn(
-                        "Unknown armor item type '{}' for '{}:{}'.",
+                        "Unsupported item_type '{}' in '{}'.",
                         itemType,
-                        namespace,
-                        itemName
+                        source
                 );
+                continue;
+            }
+
+            String itemIdString =
+                    getString(
+                            itemObject,
+                            "item_id",
+                            null
+                    );
+
+            String armorIdString =
+                    getString(
+                            itemObject,
+                            "armor_id",
+                            null
+                    );
+
+            if (itemIdString == null
+                    || itemIdString.isBlank()) {
+
+                JagTaczArmor.LOGGER.warn(
+                        "Armor entry without 'item_id' in '{}'.",
+                        source
+                );
+
+                continue;
+            }
+
+            if (armorIdString == null
+                    || armorIdString.isBlank()) {
+
+                JagTaczArmor.LOGGER.warn(
+                        "Armor entry '{}' without 'armor_id' in '{}'.",
+                        itemIdString,
+                        source
+                );
+
                 continue;
             }
 
             ResourceLocation itemId =
-                    ResourceLocation.tryBuild(
-                            namespace,
-                            itemName
-                    );
+                    ResourceLocation.tryParse(itemIdString);
+
+            ResourceLocation armorId =
+                    ResourceLocation.tryParse(armorIdString);
 
             if (itemId == null) {
                 JagTaczArmor.LOGGER.warn(
-                        "Invalid armor item id '{}:{}'",
-                        namespace,
-                        itemName
+                        "Invalid item_id '{}' in '{}'.",
+                        itemIdString,
+                        source
                 );
                 continue;
             }
 
-            if (!REGISTERED_DYNAMIC_ITEMS.add(itemId)) {
+            if (armorId == null) {
                 JagTaczArmor.LOGGER.warn(
-                        "Duplicate dynamic armor item '{}'. Skipping.",
+                        "Invalid armor_id '{}' in '{}'.",
+                        armorIdString,
+                        source
+                );
+                continue;
+            }
+
+            if (REGISTERED_DYNAMIC_ITEMS.contains(itemId)
+                    || ForgeRegistries.ITEMS.containsKey(itemId)) {
+
+                JagTaczArmor.LOGGER.warn(
+                        "Skipping duplicate item registration '{}'.",
                         itemId
                 );
+
                 continue;
             }
 
             ArmorDefinition definition =
-                    findArmorDefinition(itemId);
+                    findArmorDefinition(armorId);
 
             if (definition == null) {
-                REGISTERED_DYNAMIC_ITEMS.remove(itemId);
-
                 JagTaczArmor.LOGGER.warn(
-                        "No armor definition found for item '{}'.",
+                        "Armor definition '{}' referenced by item '{}' "
+                                + "was not found.",
+                        armorId,
                         itemId
                 );
 
@@ -284,9 +392,9 @@ public class ItemRegistry {
 
             CustomGeoArmorItem item =
                     new CustomGeoArmorItem(
-                            definition.slot,
+                            definition.slot(),
                             new Item.Properties(),
-                            definition.index,
+                            definition.index(),
                             itemId.toString()
                     );
 
@@ -298,6 +406,11 @@ public class ItemRegistry {
                     )
             );
 
+            REGISTERED_DYNAMIC_ITEMS.add(itemId);
+
+            /*
+             * Сохраняем RegistryObject для старого API.
+             */
             ADDON_ITEMS.put(
                     itemId,
                     RegistryObject.create(
@@ -306,24 +419,44 @@ public class ItemRegistry {
                     )
             );
 
-            JagTaczArmor.LOGGER.info(
-                    "Registered armor item '{}' -> {}",
+            /*
+             * Сохраняем сам CustomGeoArmorItem.
+             *
+             * CreativeTabRegistry использует эту коллекцию.
+             */
+            ADDON_ITEM_INSTANCES.put(
                     itemId,
-                    definition.slot
+                    item
+            );
+
+            JagTaczArmor.LOGGER.info(
+                    "Registered addon armor item: item_id='{}', "
+                            + "armor_id='{}', slot='{}', source='{}'",
+                    itemId,
+                    armorId,
+                    definition.slot(),
+                    source
             );
         }
     }
 
+    /**
+     * Находит ArmorSetIndex по armor_id.
+     */
     private static ArmorDefinition findArmorDefinition(
-            ResourceLocation itemId
+            ResourceLocation armorId
     ) {
         ArmorSetIndex set =
-                AddonPackLoader.ARMOR_SET_INDEXES.get(itemId);
+                AddonPackLoader.ARMOR_SET_INDEXES.get(armorId);
 
         if (set == null) {
             return null;
         }
 
+        /*
+         * В текущей системе каждый armor JSON
+         * содержит одну конкретную часть брони.
+         */
         if (set.helmet != null) {
             return new ArmorDefinition(
                     set.helmet,
@@ -355,36 +488,72 @@ public class ItemRegistry {
         return null;
     }
 
+    private static String getString(
+            JsonObject object,
+            String key,
+            String defaultValue
+    ) {
+        if (!object.has(key)
+                || object.get(key).isJsonNull()) {
+            return defaultValue;
+        }
+
+        try {
+            return object.get(key).getAsString();
+        } catch (RuntimeException exception) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Возвращает реальные экземпляры addon armor items.
+     *
+     * Используется CreativeTabRegistry.
+     */
+    public static Map<ResourceLocation, CustomGeoArmorItem>
+    getAddonItems() {
+        return ADDON_ITEM_INSTANCES;
+    }
+
+    /**
+     * Старый API — RegistryObject по ResourceLocation.
+     */
     public static RegistryObject<Item> getAddonItem(
             ResourceLocation id
     ) {
         return ADDON_ITEMS.get(id);
     }
 
+    /**
+     * Старый API — поиск по строковому ID.
+     */
     public static RegistryObject<Item> getAddonItem(
             String id
     ) {
-        for (Map.Entry<ResourceLocation, RegistryObject<Item>> entry :
-                ADDON_ITEMS.entrySet()) {
+        ResourceLocation resourceLocation =
+                ResourceLocation.tryParse(id);
 
-            if (entry.getKey().getPath().equals(id)) {
-                return entry.getValue();
-            }
+        if (resourceLocation == null) {
+            return null;
         }
 
-        return null;
+        return getAddonItem(resourceLocation);
     }
 
     public static boolean isAddonArmor(
             ResourceLocation id
     ) {
-        return ADDON_ITEMS.containsKey(id);
+        return ADDON_ITEM_INSTANCES.containsKey(id);
     }
 
     public static boolean isAddonArmor(
             String id
     ) {
-        return getAddonItem(id) != null;
+        ResourceLocation resourceLocation =
+                ResourceLocation.tryParse(id);
+
+        return resourceLocation != null
+                && isAddonArmor(resourceLocation);
     }
 
     private record ArmorDefinition(
@@ -399,50 +568,57 @@ public class ItemRegistry {
                 JagTaczArmor.MODID
         );
 
-        CUSTOM_HELMET = ITEMS.register(
-                "tk_hm",
-                () -> new CustomGeoArmorItem(
-                        Type.HELMET,
-                        new Item.Properties()
-                )
-        );
+        CUSTOM_HELMET =
+                ITEMS.register(
+                        "tk_hm",
+                        () -> new CustomGeoArmorItem(
+                                Type.HELMET,
+                                new Item.Properties()
+                        )
+                );
 
-        CUSTOM_CHESTPLATE = ITEMS.register(
-                "tk_ch",
-                () -> new CustomGeoArmorItem(
-                        Type.CHESTPLATE,
-                        new Item.Properties()
-                )
-        );
+        CUSTOM_CHESTPLATE =
+                ITEMS.register(
+                        "tk_ch",
+                        () -> new CustomGeoArmorItem(
+                                Type.CHESTPLATE,
+                                new Item.Properties()
+                        )
+                );
 
-        CUSTOM_LEGGINGS = ITEMS.register(
-                "tk_lg",
-                () -> new CustomGeoArmorItem(
-                        Type.LEGGINGS,
-                        new Item.Properties()
-                )
-        );
+        CUSTOM_LEGGINGS =
+                ITEMS.register(
+                        "tk_lg",
+                        () -> new CustomGeoArmorItem(
+                                Type.LEGGINGS,
+                                new Item.Properties()
+                        )
+                );
 
-        CUSTOM_BOOTS = ITEMS.register(
-                "tk_bt",
-                () -> new CustomGeoArmorItem(
-                        Type.BOOTS,
-                        new Item.Properties()
-                )
-        );
+        CUSTOM_BOOTS =
+                ITEMS.register(
+                        "tk_bt",
+                        () -> new CustomGeoArmorItem(
+                                Type.BOOTS,
+                                new Item.Properties()
+                        )
+                );
 
-        TAB_ICON = ITEMS.register(
-                "tab_icon",
-                () -> new Item(
-                        new Item.Properties()
-                )
-        );
+        TAB_ICON =
+                ITEMS.register(
+                        "tab_icon",
+                        () -> new Item(
+                                new Item.Properties()
+                        )
+                );
 
-        PLATE_ARMOR = ITEMS.register(
-                "plate_armor",
-                () -> new CustomPlateItem(
-                        new Item.Properties().stacksTo(4)
-                )
-        );
+        PLATE_ARMOR =
+                ITEMS.register(
+                        "plate_armor",
+                        () -> new CustomPlateItem(
+                                new Item.Properties()
+                                        .stacksTo(4)
+                        )
+                );
     }
 }

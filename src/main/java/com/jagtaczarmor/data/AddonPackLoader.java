@@ -2,6 +2,7 @@ package com.jagtaczarmor.data;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -60,20 +61,15 @@ import java.util.zip.ZipFile;
 
 @EventBusSubscriber(modid = "jagtaczarmor", bus = Bus.FORGE)
 public class AddonPackLoader implements RepositorySource {
-    public static final AddonPackLoader INSTANCE = new AddonPackLoader();
 
-    private static final Gson GSON = new GsonBuilder().create();
+    public static final AddonPackLoader INSTANCE =
+            new AddonPackLoader();
 
-    /**
-     * Все загруженные armor pack'и.
-     *
-     * Для директории:
-     * tacz/jag_default_armor
-     *
-     * Для zip:
-     * tacz/some_pack.zip
-     */
-    private static final List<Path> LOADED_PACK_PATHS = new ArrayList<>();
+    private static final Gson GSON =
+            new GsonBuilder().create();
+
+    private static final List<Path> LOADED_PACK_PATHS =
+            new ArrayList<>();
 
     public static final Map<ResourceLocation, ArmorSetIndex> ARMOR_SET_INDEXES =
             new HashMap<>();
@@ -105,18 +101,11 @@ public class AddonPackLoader implements RepositorySource {
     public static final Map<String, ArmorIndex> TAGGED_ARMORS =
             new HashMap<>();
 
-    private static final String[] PIECE_NAMES = new String[]{
-            "tk_hm",
-            "tk_ch",
-            "tk_lg",
-            "tk_bt"
-    };
-
     private static final Map<Integer, Map<Integer, String>> CMD_TEXTURES =
             new HashMap<>();
 
     /**
-     * Защита от повторной регистрации одного и того же registry ID
+     * Защита от повторной регистрации одного registry ID
      * в рамках одного RegisterEvent.
      */
     private static final Set<ResourceLocation> REGISTERED_ITEM_IDS =
@@ -125,12 +114,15 @@ public class AddonPackLoader implements RepositorySource {
     public AddonPackLoader() {
     }
 
-    public static int getOrCreateArmorCmd(ResourceLocation id) {
+    public static int getOrCreateArmorCmd(
+            ResourceLocation id
+    ) {
         if (ARMOR_SET_CMD.containsKey(id)) {
             return ARMOR_SET_CMD.get(id);
         }
 
-        int cmd = Math.abs(id.toString().hashCode());
+        int cmd =
+                Math.abs(id.toString().hashCode());
 
         if (cmd == 0) {
             cmd = 1;
@@ -143,18 +135,28 @@ public class AddonPackLoader implements RepositorySource {
             ++cmd;
         }
 
-        CMD_TO_ARMOR_ID.put(cmd, id);
-        ARMOR_SET_CMD.put(id, cmd);
+        CMD_TO_ARMOR_ID.put(
+                cmd,
+                id
+        );
+
+        ARMOR_SET_CMD.put(
+                id,
+                cmd
+        );
 
         return cmd;
     }
 
-    public static int getOrCreatePlateCmd(ResourceLocation id) {
+    public static int getOrCreatePlateCmd(
+            ResourceLocation id
+    ) {
         if (PLATE_CMD.containsKey(id)) {
             return PLATE_CMD.get(id);
         }
 
-        int cmd = Math.abs(id.toString().hashCode());
+        int cmd =
+                Math.abs(id.toString().hashCode());
 
         if (cmd == 0) {
             cmd = 1;
@@ -167,8 +169,15 @@ public class AddonPackLoader implements RepositorySource {
             ++cmd;
         }
 
-        CMD_TO_PLATE_ID.put(cmd, id);
-        PLATE_CMD.put(id, cmd);
+        CMD_TO_PLATE_ID.put(
+                cmd,
+                id
+        );
+
+        PLATE_CMD.put(
+                id,
+                cmd
+        );
 
         return cmd;
     }
@@ -177,25 +186,42 @@ public class AddonPackLoader implements RepositorySource {
         return CMD_TEXTURES;
     }
 
-    public static String getCmdTexture(int cmd, int pieceIdx) {
-        Map<Integer, String> map = CMD_TEXTURES.get(cmd);
-        return map != null ? map.get(pieceIdx) : null;
+    public static String getCmdTexture(
+            int cmd,
+            int pieceIdx
+    ) {
+        Map<Integer, String> map =
+                CMD_TEXTURES.get(cmd);
+
+        return map != null
+                ? map.get(pieceIdx)
+                : null;
     }
 
     public static void init() {
-        Path taczDir = FMLPaths.GAMEDIR.get().resolve("tacz");
-        Path defaultPackDir = taczDir.resolve("jag_default_armor");
+        Path taczDir =
+                FMLPaths.GAMEDIR.get().resolve("tacz");
+
+        Path defaultPackDir =
+                taczDir.resolve("jag_default_armor");
 
         try {
-            if (!Files.exists(taczDir, new LinkOption[0])) {
+            if (!Files.exists(taczDir)) {
                 Files.createDirectories(taczDir);
             }
 
-            Path legacyGen = taczDir.resolve("jag_generated_resources");
+            Path legacyGen =
+                    taczDir.resolve(
+                            "jag_generated_resources"
+                    );
 
-            if (Files.exists(legacyGen, new LinkOption[0])) {
-                try (Stream<Path> walk = Files.walk(legacyGen)) {
-                    walk.sorted(Comparator.reverseOrder())
+            if (Files.exists(legacyGen)) {
+                try (Stream<Path> walk =
+                             Files.walk(legacyGen)) {
+
+                    walk.sorted(
+                                    Comparator.reverseOrder()
+                            )
                             .map(Path::toFile)
                             .forEach(File::delete);
                 }
@@ -210,14 +236,21 @@ public class AddonPackLoader implements RepositorySource {
 
         boolean shouldExtract = true;
 
-        if (Files.exists(defaultPackDir, new LinkOption[0])) {
+        if (Files.exists(defaultPackDir)) {
+
             if (!ArmorConfig.DATA.overwrite_default_pack) {
                 shouldExtract = false;
+
             } else {
-                try (Stream<Path> walk = Files.walk(defaultPackDir)) {
-                    walk.sorted(Comparator.reverseOrder())
+                try (Stream<Path> walk =
+                             Files.walk(defaultPackDir)) {
+
+                    walk.sorted(
+                                    Comparator.reverseOrder()
+                            )
                             .map(Path::toFile)
                             .forEach(File::delete);
+
                 } catch (Exception e) {
                     JagTaczArmor.LOGGER.error(
                             "Failed to clean up old default pack",
@@ -228,13 +261,16 @@ public class AddonPackLoader implements RepositorySource {
         }
 
         if (shouldExtract) {
-            extractDefaultPack(defaultPackDir);
+            extractDefaultPack(
+                    defaultPackDir
+            );
         }
 
         reloadPacks();
     }
 
     public static void reloadPacks() {
+
         JagTaczArmor.LOGGER.info(
                 "Reloading JagTaczArmor packs..."
         );
@@ -272,8 +308,9 @@ public class AddonPackLoader implements RepositorySource {
 
         Arrays.sort(
                 packs,
-                (a, b) ->
-                        a.getName().compareTo(b.getName())
+                Comparator.comparing(
+                        File::getName
+                )
         );
 
         for (File pack : packs) {
@@ -283,12 +320,14 @@ public class AddonPackLoader implements RepositorySource {
              * DIRECTORY PACK
              * =========================================================
              */
+
             if (
                     pack.isDirectory()
                             && !pack.getName().equals(
                             "jag_generated_resources"
                     )
             ) {
+
                 File metaFile =
                         new File(
                                 pack,
@@ -312,6 +351,7 @@ public class AddonPackLoader implements RepositorySource {
                             );
 
                 } catch (Exception e) {
+
                     JagTaczArmor.LOGGER.error(
                             "Failed to parse armorpack.meta.json for "
                                     + pack.getName(),
@@ -320,11 +360,13 @@ public class AddonPackLoader implements RepositorySource {
                 }
 
                 if (packMeta == null) {
-                    packMeta = new PackMeta();
+                    packMeta =
+                            new PackMeta();
                 }
 
                 if (packMeta.name == null) {
-                    packMeta.name = pack.getName();
+                    packMeta.name =
+                            pack.getName();
                 }
 
                 PACK_METAS.put(
@@ -340,11 +382,14 @@ public class AddonPackLoader implements RepositorySource {
 
                 if (!packMcMeta.exists()) {
                     try {
+
                         Files.writeString(
                                 packMcMeta.toPath(),
                                 "{\"pack\":{\"pack_format\":15,\"description\":\"JagTaczArmor Addon\"}}"
                         );
+
                     } catch (Exception e) {
+
                         JagTaczArmor.LOGGER.error(
                                 "Failed to generate pack.mcmeta for "
                                         + pack.getName(),
@@ -354,10 +399,7 @@ public class AddonPackLoader implements RepositorySource {
                 }
 
                 /*
-                 * Сохраняем сам pack path.
-                 *
-                 * Позже registerAddonItems() прочитает
-                 * items.json непосредственно из корня этого pack.
+                 * items.json находится в корне этого pack.
                  */
                 LOADED_PACK_PATHS.add(
                         pack.toPath()
@@ -369,7 +411,8 @@ public class AddonPackLoader implements RepositorySource {
 
                 ACTIVE_PACKS.add(
                         new PathPackResources(
-                                "jagtaczarmor_addon_" + pack.getName(),
+                                "jagtaczarmor_addon_"
+                                        + pack.getName(),
                                 true,
                                 pack.toPath()
                         )
@@ -380,17 +423,22 @@ public class AddonPackLoader implements RepositorySource {
                  * ZIP PACK
                  * =========================================================
                  */
+
             } else if (
                     pack.isFile()
                             && pack.getName().endsWith(".zip")
             ) {
+
                 String packName =
                         pack.getName().substring(
                                 0,
                                 pack.getName().length() - 4
                         );
 
-                try (ZipFile zip = new ZipFile(pack)) {
+                try (
+                        ZipFile zip =
+                                new ZipFile(pack)
+                ) {
 
                     ZipEntry metaEntry =
                             zip.getEntry(
@@ -405,7 +453,9 @@ public class AddonPackLoader implements RepositorySource {
 
                     try (
                             InputStream in =
-                                    zip.getInputStream(metaEntry);
+                                    zip.getInputStream(
+                                            metaEntry
+                                    );
 
                             InputStreamReader reader =
                                     new InputStreamReader(
@@ -413,6 +463,7 @@ public class AddonPackLoader implements RepositorySource {
                                             StandardCharsets.UTF_8
                                     )
                     ) {
+
                         packMeta =
                                 GSON.fromJson(
                                         reader,
@@ -420,6 +471,7 @@ public class AddonPackLoader implements RepositorySource {
                                 );
 
                     } catch (Exception e) {
+
                         JagTaczArmor.LOGGER.error(
                                 "Failed to parse armorpack.meta.json inside "
                                         + pack.getName(),
@@ -428,11 +480,13 @@ public class AddonPackLoader implements RepositorySource {
                     }
 
                     if (packMeta == null) {
-                        packMeta = new PackMeta();
+                        packMeta =
+                                new PackMeta();
                     }
 
                     if (packMeta.name == null) {
-                        packMeta.name = packName;
+                        packMeta.name =
+                                packName;
                     }
 
                     PACK_METAS.put(
@@ -440,13 +494,6 @@ public class AddonPackLoader implements RepositorySource {
                             packMeta
                     );
 
-                    /*
-                     * ВАЖНО:
-                     *
-                     * ZIP тоже добавляем в LOADED_PACK_PATHS.
-                     * registerAddonItems() ниже умеет читать
-                     * items.json непосредственно из ZIP.
-                     */
                     LOADED_PACK_PATHS.add(
                             pack.toPath()
                     );
@@ -458,13 +505,15 @@ public class AddonPackLoader implements RepositorySource {
 
                     ACTIVE_PACKS.add(
                             new FilePackResources(
-                                    "jagtaczarmor_addon_" + packName,
+                                    "jagtaczarmor_addon_"
+                                            + packName,
                                     pack,
                                     true
                             )
                     );
 
                 } catch (Exception e) {
+
                     JagTaczArmor.LOGGER.error(
                             "Failed to process zip pack: "
                                     + pack.getName(),
@@ -475,36 +524,31 @@ public class AddonPackLoader implements RepositorySource {
         }
     }
 
-    /**
+    /*
      * ================================================================
-     * НОВАЯ СИСТЕМА РЕГИСТРАЦИИ ПРЕДМЕТОВ
+     * ITEM REGISTRATION
      * ================================================================
      *
-     * Читает items.json из каждого armor pack.
-     *
-     * Пример:
+     * items.json:
      *
      * {
-     *   "armor": {
-     *     "tactical_armor_helmet": {
-     *       "item_type": "custom_geo_armor",
-     *       "armor_id": "jag_default_armor:tactical_armor",
-     *       "slot": "helmet"
+     *   "armor": [
+     *     {
+     *       "item_id": "lrarmor_pack:atf_helmet",
+     *       "armor_id": "lrarmor_pack:atf_helmet",
+     *       "item_type": "armor"
      *     }
-     *   }
+     *   ]
      * }
      *
-     * В данном случае registry ID:
+     * Именно item_id является Minecraft registry ID.
      *
-     * jag_default_armor:tactical_armor_helmet
-     *
-     * а armor_id:
-     *
-     * jag_default_armor:tactical_armor
-     *
-     * является ссылкой на armor definition.
+     * armor_id указывает на конкретный armor JSON.
      */
-    public static void registerAddonItems(RegisterEvent event) {
+    public static void registerAddonItems(
+            RegisterEvent event
+    ) {
+
         if (
                 !event.getRegistryKey().equals(
                         ForgeRegistries.ITEMS.getRegistryKey()
@@ -519,19 +563,25 @@ public class AddonPackLoader implements RepositorySource {
                 "[JagTaczArmor] Registering armor items from items.json..."
         );
 
-        for (Path packPath : LOADED_PACK_PATHS) {
+        for (Path packPath :
+                LOADED_PACK_PATHS) {
+
             try {
+
                 if (Files.isDirectory(packPath)) {
+
                     registerItemsFromDirectory(
                             event,
                             packPath
                     );
+
                 } else if (
                         Files.isRegularFile(packPath)
                                 && packPath.getFileName()
                                 .toString()
                                 .endsWith(".zip")
                 ) {
+
                     registerItemsFromZip(
                             event,
                             packPath
@@ -539,6 +589,7 @@ public class AddonPackLoader implements RepositorySource {
                 }
 
             } catch (Exception e) {
+
                 JagTaczArmor.LOGGER.error(
                         "[JagTaczArmor] Failed to register items from pack "
                                 + packPath,
@@ -552,10 +603,14 @@ public class AddonPackLoader implements RepositorySource {
             RegisterEvent event,
             Path packPath
     ) {
+
         Path itemsPath =
-                packPath.resolve("items.json");
+                packPath.resolve(
+                        "items.json"
+                );
 
         if (!Files.exists(itemsPath)) {
+
             JagTaczArmor.LOGGER.info(
                     "[JagTaczArmor] No items.json in pack {}",
                     packPath.getFileName()
@@ -573,10 +628,14 @@ public class AddonPackLoader implements RepositorySource {
                                 itemsPath.toFile()
                         )
         ) {
+
             JsonElement rootElement =
-                    JsonParser.parseReader(reader);
+                    JsonParser.parseReader(
+                            reader
+                    );
 
             if (!rootElement.isJsonObject()) {
+
                 JagTaczArmor.LOGGER.error(
                         "[JagTaczArmor] items.json in {} is not an object",
                         packName
@@ -592,6 +651,7 @@ public class AddonPackLoader implements RepositorySource {
             );
 
         } catch (Exception e) {
+
             JagTaczArmor.LOGGER.error(
                     "[JagTaczArmor] Failed to read items.json from "
                             + packName,
@@ -604,6 +664,7 @@ public class AddonPackLoader implements RepositorySource {
             RegisterEvent event,
             Path packPath
     ) {
+
         String fileName =
                 packPath.getFileName().toString();
 
@@ -615,12 +676,20 @@ public class AddonPackLoader implements RepositorySource {
                 )
                         : fileName;
 
-        try (ZipFile zip = new ZipFile(packPath.toFile())) {
+        try (
+                ZipFile zip =
+                        new ZipFile(
+                                packPath.toFile()
+                        )
+        ) {
 
             ZipEntry itemsEntry =
-                    zip.getEntry("items.json");
+                    zip.getEntry(
+                            "items.json"
+                    );
 
             if (itemsEntry == null) {
+
                 JagTaczArmor.LOGGER.info(
                         "[JagTaczArmor] No items.json in zip pack {}",
                         packName
@@ -631,7 +700,9 @@ public class AddonPackLoader implements RepositorySource {
 
             try (
                     InputStream in =
-                            zip.getInputStream(itemsEntry);
+                            zip.getInputStream(
+                                    itemsEntry
+                            );
 
                     InputStreamReader reader =
                             new InputStreamReader(
@@ -639,10 +710,14 @@ public class AddonPackLoader implements RepositorySource {
                                     StandardCharsets.UTF_8
                             )
             ) {
+
                 JsonElement rootElement =
-                        JsonParser.parseReader(reader);
+                        JsonParser.parseReader(
+                                reader
+                        );
 
                 if (!rootElement.isJsonObject()) {
+
                     JagTaczArmor.LOGGER.error(
                             "[JagTaczArmor] items.json in zip pack {} is not an object",
                             packName
@@ -659,6 +734,7 @@ public class AddonPackLoader implements RepositorySource {
             }
 
         } catch (Exception e) {
+
             JagTaczArmor.LOGGER.error(
                     "[JagTaczArmor] Failed to read items.json from zip pack "
                             + packName,
@@ -667,72 +743,58 @@ public class AddonPackLoader implements RepositorySource {
         }
     }
 
+    /**
+     * Читает:
+     *
+     * "armor": [
+     *   {
+     *     "item_id": "...",
+     *     "armor_id": "...",
+     *     "item_type": "armor"
+     *   }
+     * ]
+     */
     private static void registerArmorItemsFromJson(
             RegisterEvent event,
             JsonObject root,
             String packName
     ) {
-        JsonObject armorObject = null;
 
-        /*
-         * Основная группа.
-         */
-        if (root.has("armor")
-                && root.get("armor").isJsonObject()) {
-
-            armorObject =
-                    root.getAsJsonObject("armor");
-        }
-
-        /*
-         * Дополнительно поддерживаем "armors",
-         * чтобы не ломать будущие/старые паки.
-         */
         if (
-                armorObject == null
-                        && root.has("armors")
-                        && root.get("armors").isJsonObject()
+                !root.has("armor")
+                        || !root.get("armor").isJsonArray()
         ) {
-            armorObject =
-                    root.getAsJsonObject("armors");
-        }
 
-        if (armorObject == null) {
             JagTaczArmor.LOGGER.info(
-                    "[JagTaczArmor] No 'armor' section in items.json of {}",
+                    "[JagTaczArmor] No 'armor' array in items.json of {}",
                     packName
             );
 
             return;
         }
 
-        for (Map.Entry<String, JsonElement> entry :
-                armorObject.entrySet()) {
+        JsonArray armorArray =
+                root.getAsJsonArray(
+                        "armor"
+                );
 
-            String itemPath =
-                    entry.getKey();
+        for (JsonElement element :
+                armorArray) {
 
-            JsonElement value =
-                    entry.getValue();
+            if (!element.isJsonObject()) {
 
-            if (!value.isJsonObject()) {
                 JagTaczArmor.LOGGER.error(
-                        "[JagTaczArmor] Item '{}' in pack {} is not an object",
-                        itemPath,
+                        "[JagTaczArmor] Invalid armor entry in {}",
                         packName
                 );
 
                 continue;
             }
 
-            JsonObject itemObject =
-                    value.getAsJsonObject();
-
             registerSingleArmorItem(
                     event,
                     packName,
-                    itemPath,
-                    itemObject
+                    element.getAsJsonObject()
             );
         }
     }
@@ -740,51 +802,130 @@ public class AddonPackLoader implements RepositorySource {
     private static void registerSingleArmorItem(
             RegisterEvent event,
             String packName,
-            String itemPath,
             JsonObject itemObject
     ) {
+
         String itemType =
                 getString(
                         itemObject,
                         "item_type",
-                        "custom_geo_armor"
+                        "armor"
                 );
 
-        /*
-         * Пока armor group предназначен именно
-         * для CustomGeoArmorItem.
-         */
-        if (!itemType.equalsIgnoreCase("custom_geo_armor")
-                && !itemType.equalsIgnoreCase("armor")
-                && !itemType.equalsIgnoreCase("custom_armor")) {
+        if (
+                !itemType.equalsIgnoreCase("armor")
+                        && !itemType.equalsIgnoreCase(
+                        "custom_geo_armor"
+                )
+                        && !itemType.equalsIgnoreCase(
+                        "custom_armor"
+                )
+        ) {
 
             JagTaczArmor.LOGGER.warn(
-                    "[JagTaczArmor] Unknown armor item_type '{}' for {}:{}",
+                    "[JagTaczArmor] Unknown item_type '{}' in pack {}",
                     itemType,
-                    packName,
-                    itemPath
+                    packName
+            );
+
+            return;
+        }
+
+        /*
+         * ------------------------------------------------------------
+         * item_id
+         * ------------------------------------------------------------
+         */
+
+        String itemIdString =
+                getString(
+                        itemObject,
+                        "item_id",
+                        null
+                );
+
+        if (
+                itemIdString == null
+                        || itemIdString.trim().isEmpty()
+        ) {
+
+            JagTaczArmor.LOGGER.error(
+                    "[JagTaczArmor] Armor item in pack {} has no item_id",
+                    packName
             );
 
             return;
         }
 
         ResourceLocation itemId =
-                resolveItemId(
-                        packName,
-                        itemPath
+                ResourceLocation.tryParse(
+                        itemIdString
                 );
 
         if (itemId == null) {
+
             JagTaczArmor.LOGGER.error(
-                    "[JagTaczArmor] Invalid item ID '{}:{}'",
-                    packName,
-                    itemPath
+                    "[JagTaczArmor] Invalid item_id '{}' in pack {}",
+                    itemIdString,
+                    packName
             );
 
             return;
         }
 
-        if (REGISTERED_ITEM_IDS.contains(itemId)) {
+        /*
+         * ------------------------------------------------------------
+         * armor_id
+         * ------------------------------------------------------------
+         */
+
+        String armorIdString =
+                getString(
+                        itemObject,
+                        "armor_id",
+                        null
+                );
+
+        if (
+                armorIdString == null
+                        || armorIdString.trim().isEmpty()
+        ) {
+
+            JagTaczArmor.LOGGER.error(
+                    "[JagTaczArmor] Armor item {} has no armor_id",
+                    itemId
+            );
+
+            return;
+        }
+
+        ResourceLocation armorId =
+                ResourceLocation.tryParse(
+                        armorIdString
+                );
+
+        if (armorId == null) {
+
+            JagTaczArmor.LOGGER.error(
+                    "[JagTaczArmor] Invalid armor_id '{}' for item {}",
+                    armorIdString,
+                    itemId
+            );
+
+            return;
+        }
+
+        /*
+         * Один и тот же Minecraft registry ID
+         * нельзя зарегистрировать дважды.
+         */
+
+        if (
+                REGISTERED_ITEM_IDS.contains(
+                        itemId
+                )
+        ) {
+
             JagTaczArmor.LOGGER.warn(
                     "[JagTaczArmor] Duplicate armor item ID {}, skipping",
                     itemId
@@ -793,23 +934,47 @@ public class AddonPackLoader implements RepositorySource {
             return;
         }
 
-        String slot =
-                getString(
-                        itemObject,
-                        "slot",
-                        null
+        /*
+         * ------------------------------------------------------------
+         * Ищем конкретный armor JSON.
+         *
+         * Например:
+         *
+         * lrarmor_pack:atf_helmet
+         *
+         * соответствует:
+         *
+         * data/lrarmor_pack/data/armors/atf_helmet.json
+         *
+         * ------------------------------------------------------------
+         */
+
+        ArmorSetIndex armorDefinition =
+                ARMOR_SET_INDEXES.get(
+                        armorId
                 );
 
+        if (armorDefinition == null) {
+
+            JagTaczArmor.LOGGER.error(
+                    "[JagTaczArmor] armor_id {} was not found for item {}",
+                    armorId,
+                    itemId
+            );
+
+            return;
+        }
+
         ArmorIndex armorIndex =
-                resolveArmorIndex(
-                        itemId,
-                        itemObject,
-                        slot
+                getArmorIndexFromDefinition(
+                        armorDefinition
                 );
 
         if (armorIndex == null) {
+
             JagTaczArmor.LOGGER.error(
-                    "[JagTaczArmor] Could not resolve armor definition for item {}",
+                    "[JagTaczArmor] armor_id {} contains no armor piece for item {}",
+                    armorId,
                     itemId
             );
 
@@ -818,11 +983,11 @@ public class AddonPackLoader implements RepositorySource {
 
         Type armorType =
                 resolveArmorType(
-                        armorIndex,
-                        slot
+                        armorIndex
                 );
 
         if (armorType == null) {
+
             JagTaczArmor.LOGGER.error(
                     "[JagTaczArmor] Could not resolve armor slot for item {}",
                     itemId
@@ -831,25 +996,40 @@ public class AddonPackLoader implements RepositorySource {
             return;
         }
 
+        /*
+         * ------------------------------------------------------------
+         * Создаём реальный Minecraft Item.
+         * ------------------------------------------------------------
+         */
+
         CustomGeoArmorItem item =
                 new CustomGeoArmorItem(
                         armorType,
-                        new Item.Properties().stacksTo(1),
+                        new Item.Properties()
+                                .stacksTo(1),
                         armorIndex,
                         itemId.toString()
                 );
 
         /*
-         * Сначала сохраняем item в ItemRegistry.
+         * Сохраняем в собственную карту JagTaczArmor.
+         *
+         * Здесь больше НЕ вызываем старый
+         * ItemRegistry.registerAddonArmor().
+         *
+         * Именно эта строка убирает твою текущую
+         * ошибку compilation:
+         *
+         * cannot find symbol:
+         * registerAddonArmor(...)
          */
-        ItemRegistry.registerAddonArmor(
+        ItemRegistry.getAddonItems().put(
                 itemId,
                 item
         );
 
         /*
-         * Затем регистрируем его непосредственно
-         * в Minecraft Forge ITEM registry.
+         * Регистрируем настоящий Minecraft registry ID.
          */
         event.register(
                 ForgeRegistries.ITEMS.getRegistryKey(),
@@ -865,430 +1045,88 @@ public class AddonPackLoader implements RepositorySource {
         );
 
         JagTaczArmor.LOGGER.info(
-                "[JagTaczArmor] Registered armor item: {} | type={} | armor={} | tag={}",
+                "[JagTaczArmor] Registered armor item: {} | armor_id={} | type={}",
                 itemId,
-                armorType,
-                getArmorDefinitionId(itemObject, armorIndex),
-                armorIndex.armorTag
+                armorId,
+                armorType
         );
     }
 
-    private static ResourceLocation resolveItemId(
-            String packName,
-            String itemPath
+    /**
+     * Каждый armor JSON сейчас является отдельной записью.
+     *
+     * Поэтому:
+     *
+     * atf_helmet.json
+     *
+     * даёт ArmorSetIndex, внутри которого только helmet.
+     *
+     * atf_chestplate.json
+     *
+     * даёт ArmorSetIndex, внутри которого только chestplate.
+     */
+    private static ArmorIndex getArmorIndexFromDefinition(
+            ArmorSetIndex definition
     ) {
-        /*
-         * Разрешаем явный namespace:
-         *
-         * "some_namespace:item_name"
-         */
-        if (itemPath.contains(":")) {
-            ResourceLocation parsed =
-                    ResourceLocation.tryParse(
-                            itemPath
-                    );
 
-            if (parsed != null) {
-                return parsed;
-            }
-
+        if (definition == null) {
             return null;
         }
 
-        /*
-         * Как и в TaCZ:
-         *
-         * namespace = имя gun/armor pack
-         * path = ключ из items.json
-         *
-         * Например:
-         *
-         * pack:
-         * jag_default_armor
-         *
-         * key:
-         * tactical_armor_helmet
-         *
-         * result:
-         * jag_default_armor:tactical_armor_helmet
-         */
-        return ResourceLocation.tryBuild(
-                packName,
-                itemPath
-        );
-    }
-
-    private static ArmorIndex resolveArmorIndex(
-            ResourceLocation itemId,
-            JsonObject itemObject,
-            String slot
-    ) {
-        /*
-         * ------------------------------------------------------------
-         * 1. Явный armor_tag
-         * ------------------------------------------------------------
-         */
-        String armorTag =
-                getString(
-                        itemObject,
-                        "armor_tag",
-                        null
-                );
-
-        if (armorTag != null
-                && !armorTag.trim().isEmpty()) {
-
-            ArmorIndex tagged =
-                    TAGGED_ARMORS.get(
-                            armorTag.trim()
-                    );
-
-            if (tagged != null) {
-                return tagged;
-            }
-
-            JagTaczArmor.LOGGER.warn(
-                    "[JagTaczArmor] armor_tag '{}' was not found for {}",
-                    armorTag,
-                    itemId
-            );
+        if (definition.helmet != null) {
+            return definition.helmet;
         }
 
-        /*
-         * ------------------------------------------------------------
-         * 2. Явный armor_id
-         * ------------------------------------------------------------
-         *
-         * Например:
-         *
-         * "armor_id": "jag_default_armor:tactical_armor"
-         */
-        String armorIdString =
-                getString(
-                        itemObject,
-                        "armor_id",
-                        null
-                );
-
-        if (armorIdString != null
-                && !armorIdString.trim().isEmpty()) {
-
-            ResourceLocation armorId =
-                    ResourceLocation.tryParse(
-                            armorIdString
-                    );
-
-            if (armorId != null) {
-                ArmorSetIndex setIndex =
-                        ARMOR_SET_INDEXES.get(
-                                armorId
-                        );
-
-                if (setIndex != null) {
-                    ArmorIndex piece =
-                            getArmorPiece(
-                                    setIndex,
-                                    slot
-                            );
-
-                    if (piece != null) {
-                        return piece;
-                    }
-
-                    /*
-                     * Если slot не указан,
-                     * попробуем определить часть
-                     * по самому ArmorIndex.
-                     */
-                    ArmorIndex inferred =
-                            inferOnlyArmorPiece(
-                                    setIndex
-                            );
-
-                    if (inferred != null) {
-                        return inferred;
-                    }
-                }
-
-                JagTaczArmor.LOGGER.warn(
-                        "[JagTaczArmor] armor_id '{}' was not found for {}",
-                        armorId,
-                        itemId
-                );
-            }
+        if (definition.chestplate != null) {
+            return definition.chestplate;
         }
 
-        /*
-         * ------------------------------------------------------------
-         * 3. Автоматический поиск по ID предмета
-         * ------------------------------------------------------------
-         *
-         * Например:
-         *
-         * tactical_armor_helmet
-         *
-         * превращается в:
-         *
-         * tactical_armor
-         */
-        String baseName =
-                removeArmorPieceSuffix(
-                        itemId.getPath()
-                );
-
-        if (!baseName.equals(itemId.getPath())) {
-
-            ResourceLocation inferredSetId =
-                    ResourceLocation.tryBuild(
-                            getString(
-                                    itemObject,
-                                    "armor_namespace",
-                                    itemId.getNamespace()
-                            ),
-                            baseName
-                    );
-
-            if (inferredSetId != null) {
-                ArmorSetIndex setIndex =
-                        ARMOR_SET_INDEXES.get(
-                                inferredSetId
-                        );
-
-                if (setIndex != null) {
-                    ArmorIndex piece =
-                            getArmorPiece(
-                                    setIndex,
-                                    slot
-                            );
-
-                    if (piece != null) {
-                        return piece;
-                    }
-
-                    ArmorIndex inferred =
-                            inferArmorPieceFromItemId(
-                                    setIndex,
-                                    itemId
-                            );
-
-                    if (inferred != null) {
-                        return inferred;
-                    }
-                }
-            }
+        if (definition.leggings != null) {
+            return definition.leggings;
         }
 
-        /*
-         * Последняя попытка:
-         * найти set по armor_id без slot.
-         */
+        if (definition.boots != null) {
+            return definition.boots;
+        }
+
         return null;
     }
 
-    private static ArmorIndex getArmorPiece(
-            ArmorSetIndex setIndex,
-            String slot
+    private static Type resolveArmorType(
+            ArmorIndex armorIndex
     ) {
-        if (setIndex == null
-                || slot == null
-                || slot.trim().isEmpty()) {
+
+        if (
+                armorIndex == null
+                        || armorIndex.slot == null
+        ) {
             return null;
         }
 
-        switch (slot.toLowerCase()) {
+        switch (
+                armorIndex.slot.toLowerCase()
+        ) {
+
             case "helmet":
             case "head":
-                return setIndex.helmet;
+                return Type.HELMET;
 
             case "chestplate":
             case "chest":
             case "torso":
-                return setIndex.chestplate;
+                return Type.CHESTPLATE;
 
             case "leggings":
             case "legs":
-                return setIndex.leggings;
+                return Type.LEGGINGS;
 
             case "boots":
             case "feet":
-                return setIndex.boots;
+                return Type.BOOTS;
 
             default:
                 return null;
         }
-    }
-
-    private static ArmorIndex inferArmorPieceFromItemId(
-            ArmorSetIndex setIndex,
-            ResourceLocation itemId
-    ) {
-        String path =
-                itemId.getPath();
-
-        if (path.endsWith("_helmet")
-                || path.endsWith("_head")) {
-
-            return setIndex.helmet;
-        }
-
-        if (path.endsWith("_chestplate")
-                || path.endsWith("_chest")
-                || path.endsWith("_torso")) {
-
-            return setIndex.chestplate;
-        }
-
-        if (path.endsWith("_leggings")
-                || path.endsWith("_legs")) {
-
-            return setIndex.leggings;
-        }
-
-        if (path.endsWith("_boots")
-                || path.endsWith("_feet")) {
-
-            return setIndex.boots;
-        }
-
-        return null;
-    }
-
-    private static ArmorIndex inferOnlyArmorPiece(
-            ArmorSetIndex setIndex
-    ) {
-        ArmorIndex result = null;
-        int count = 0;
-
-        if (setIndex.helmet != null) {
-            result = setIndex.helmet;
-            ++count;
-        }
-
-        if (setIndex.chestplate != null) {
-            result = setIndex.chestplate;
-            ++count;
-        }
-
-        if (setIndex.leggings != null) {
-            result = setIndex.leggings;
-            ++count;
-        }
-
-        if (setIndex.boots != null) {
-            result = setIndex.boots;
-            ++count;
-        }
-
-        /*
-         * Возвращаем автоматически только если
-         * в set действительно одна часть.
-         */
-        return count == 1 ? result : null;
-    }
-
-    private static String removeArmorPieceSuffix(
-            String path
-    ) {
-        String[] suffixes = new String[]{
-                "_chestplate",
-                "_helmet",
-                "_leggings",
-                "_boots",
-                "_chest",
-                "_torso",
-                "_head",
-                "_legs",
-                "_feet"
-        };
-
-        for (String suffix : suffixes) {
-            if (path.endsWith(suffix)) {
-                return path.substring(
-                        0,
-                        path.length() - suffix.length()
-                );
-            }
-        }
-
-        return path;
-    }
-
-    private static Type resolveArmorType(
-            ArmorIndex armorIndex,
-            String slot
-    ) {
-        if (slot != null
-                && !slot.trim().isEmpty()) {
-
-            switch (slot.toLowerCase()) {
-                case "helmet":
-                case "head":
-                    return Type.HELMET;
-
-                case "chestplate":
-                case "chest":
-                case "torso":
-                    return Type.CHESTPLATE;
-
-                case "leggings":
-                case "legs":
-                    return Type.LEGGINGS;
-
-                case "boots":
-                case "feet":
-                    return Type.BOOTS;
-            }
-        }
-
-        if (armorIndex != null
-                && armorIndex.slot != null) {
-
-            switch (
-                    armorIndex.slot.toLowerCase()
-            ) {
-                case "helmet":
-                case "head":
-                    return Type.HELMET;
-
-                case "chestplate":
-                case "chest":
-                case "torso":
-                    return Type.CHESTPLATE;
-
-                case "leggings":
-                case "legs":
-                    return Type.LEGGINGS;
-
-                case "boots":
-                case "feet":
-                    return Type.BOOTS;
-            }
-        }
-
-        return null;
-    }
-
-    private static String getArmorDefinitionId(
-            JsonObject itemObject,
-            ArmorIndex armorIndex
-    ) {
-        String armorId =
-                getString(
-                        itemObject,
-                        "armor_id",
-                        null
-                );
-
-        if (armorId != null) {
-            return armorId;
-        }
-
-        if (armorIndex != null
-                && armorIndex.name != null) {
-            return armorIndex.name;
-        }
-
-        return "unknown";
     }
 
     private static String getString(
@@ -1296,13 +1134,19 @@ public class AddonPackLoader implements RepositorySource {
             String key,
             String defaultValue
     ) {
-        if (!object.has(key)
-                || object.get(key).isJsonNull()) {
+
+        if (
+                !object.has(key)
+                        || object.get(key).isJsonNull()
+        ) {
             return defaultValue;
         }
 
         try {
-            return object.get(key).getAsString();
+            return object.get(
+                    key
+            ).getAsString();
+
         } catch (Exception e) {
             return defaultValue;
         }
@@ -1311,47 +1155,60 @@ public class AddonPackLoader implements RepositorySource {
     private static void extractDefaultPack(
             Path defaultPackDir
     ) {
+
         try {
+
             URL resource =
                     AddonPackLoader.class.getResource(
                             "/default_pack.zip"
                     );
 
-            if (resource != null) {
-                File zipFile =
-                        File.createTempFile(
-                                "default_pack",
-                                ".zip"
-                        );
+            if (resource == null) {
 
-                try (InputStream in =
-                             resource.openStream()) {
+                JagTaczArmor.LOGGER.error(
+                        "Could not find default_pack.zip in resources!"
+                );
 
-                    Files.copy(
-                            in,
-                            zipFile.toPath(),
-                            StandardCopyOption.REPLACE_EXISTING
+                return;
+            }
+
+            File zipFile =
+                    File.createTempFile(
+                            "default_pack",
+                            ".zip"
                     );
-                }
 
-                ZipFile zip =
-                        new ZipFile(zipFile);
+            try (
+                    InputStream in =
+                            resource.openStream()
+            ) {
+
+                Files.copy(
+                        in,
+                        zipFile.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING
+                );
+            }
+
+            try (
+                    ZipFile zip =
+                            new ZipFile(zipFile)
+            ) {
 
                 Enumeration<? extends ZipEntry> entries =
                         zip.entries();
 
                 while (entries.hasMoreElements()) {
+
                     ZipEntry entry =
                             entries.nextElement();
 
                     String name =
-                            entry.getName();
-
-                    name =
-                            name.replace(
-                                    "\\",
-                                    "/"
-                            );
+                            entry.getName()
+                                    .replace(
+                                            "\\",
+                                            "/"
+                                    );
 
                     if (name.startsWith("/")) {
                         name =
@@ -1368,6 +1225,7 @@ public class AddonPackLoader implements RepositorySource {
                             !entry.isDirectory()
                                     && !name.endsWith("/")
                     ) {
+
                         File parent =
                                 destFile.getParentFile();
 
@@ -1380,8 +1238,11 @@ public class AddonPackLoader implements RepositorySource {
 
                         try (
                                 InputStream in =
-                                        zip.getInputStream(entry)
+                                        zip.getInputStream(
+                                                entry
+                                        )
                         ) {
+
                             Files.copy(
                                     in,
                                     destFile.toPath(),
@@ -1390,28 +1251,23 @@ public class AddonPackLoader implements RepositorySource {
                         }
 
                     } else if (!destFile.exists()) {
+
                         destFile.mkdirs();
                     }
                 }
-
-                zip.close();
-
-                if (zipFile.exists()) {
-                    zipFile.delete();
-                }
-
-                JagTaczArmor.LOGGER.info(
-                        "Successfully extracted default_pack.zip to "
-                                + defaultPackDir
-                );
-
-            } else {
-                JagTaczArmor.LOGGER.error(
-                        "Could not find default_pack.zip in resources!"
-                );
             }
 
+            if (zipFile.exists()) {
+                zipFile.delete();
+            }
+
+            JagTaczArmor.LOGGER.info(
+                    "Successfully extracted default_pack.zip to "
+                            + defaultPackDir
+            );
+
         } catch (Exception e) {
+
             JagTaczArmor.LOGGER.error(
                     "Failed to extract default pack",
                     e
@@ -1422,18 +1278,15 @@ public class AddonPackLoader implements RepositorySource {
     private static void loadArmorsFromPack(
             Path packPath
     ) {
+
         Path dataPath =
-                packPath.resolve("data");
+                packPath.resolve(
+                        "data"
+                );
 
         if (
-                !Files.exists(
-                        dataPath,
-                        new LinkOption[0]
-                )
-                        || !Files.isDirectory(
-                        dataPath,
-                        new LinkOption[0]
-                )
+                !Files.exists(dataPath)
+                        || !Files.isDirectory(dataPath)
         ) {
             return;
         }
@@ -1468,27 +1321,32 @@ public class AddonPackLoader implements RepositorySource {
                     dataSubDir.exists()
                             && dataSubDir.isDirectory()
             ) {
-                armorDirs = new File[]{
-                        new File(
-                                dataSubDir,
-                                "armors"
-                        ),
-                        new File(
-                                dataSubDir,
-                                "armor"
-                        )
-                };
+
+                armorDirs =
+                        new File[]{
+                                new File(
+                                        dataSubDir,
+                                        "armors"
+                                ),
+                                new File(
+                                        dataSubDir,
+                                        "armor"
+                                )
+                        };
+
             } else {
-                armorDirs = new File[]{
-                        new File(
-                                namespaceDir,
-                                "armors"
-                        ),
-                        new File(
-                                namespaceDir,
-                                "armor"
-                        )
-                };
+
+                armorDirs =
+                        new File[]{
+                                new File(
+                                        namespaceDir,
+                                        "armors"
+                                ),
+                                new File(
+                                        namespaceDir,
+                                        "armor"
+                                )
+                        };
             }
 
             for (File armorsDir :
@@ -1513,10 +1371,9 @@ public class AddonPackLoader implements RepositorySource {
 
                 Arrays.sort(
                         jsonFiles,
-                        (a, b) ->
-                                a.getName().compareTo(
-                                        b.getName()
-                                )
+                        Comparator.comparing(
+                                File::getName
+                        )
                 );
 
                 for (File jsonFile :
@@ -1524,8 +1381,11 @@ public class AddonPackLoader implements RepositorySource {
 
                     try (
                             FileReader reader =
-                                    new FileReader(jsonFile)
+                                    new FileReader(
+                                            jsonFile
+                                    )
                     ) {
+
                         JsonElement element =
                                 JsonParser.parseReader(
                                         reader
@@ -1537,8 +1397,6 @@ public class AddonPackLoader implements RepositorySource {
 
                         JsonObject obj =
                                 element.getAsJsonObject();
-
-                        ArmorSetIndex index;
 
                         String armorSetName =
                                 jsonFile.getName()
@@ -1553,14 +1411,10 @@ public class AddonPackLoader implements RepositorySource {
                                         armorSetName
                                 );
 
-                        if (!obj.has("slot")) {
-                            index =
-                                    GSON.fromJson(
-                                            obj,
-                                            ArmorSetIndex.class
-                                    );
+                        ArmorSetIndex index;
 
-                        } else {
+                        if (obj.has("slot")) {
+
                             ArmorIndex piece =
                                     GSON.fromJson(
                                             obj,
@@ -1574,48 +1428,33 @@ public class AddonPackLoader implements RepositorySource {
                                     piece.displayName;
 
                             if (
-                                    (nameToUse == null
+                                    nameToUse == null
                                             || "Custom Armor".equals(
-                                            nameToUse))
-                                            && piece.name != null
+                                            nameToUse
+                                    )
                             ) {
-                                nameToUse =
-                                        piece.name;
+
+                                if (piece.name != null) {
+                                    nameToUse =
+                                            piece.name;
+                                }
                             }
 
                             index.name =
                                     nameToUse;
 
-                            if (piece.slot != null) {
-                                switch (
-                                        piece.slot.toLowerCase()
-                                ) {
-                                    case "helmet":
-                                    case "head":
-                                        index.helmet =
-                                                piece;
-                                        break;
+                            assignArmorPiece(
+                                    index,
+                                    piece
+                            );
 
-                                    case "chestplate":
-                                    case "torso":
-                                    case "chest":
-                                        index.chestplate =
-                                                piece;
-                                        break;
+                        } else {
 
-                                    case "leggings":
-                                    case "legs":
-                                        index.leggings =
-                                                piece;
-                                        break;
-
-                                    case "boots":
-                                    case "feet":
-                                        index.boots =
-                                                piece;
-                                        break;
-                                }
-                            }
+                            index =
+                                    GSON.fromJson(
+                                            obj,
+                                            ArmorSetIndex.class
+                                    );
                         }
 
                         ARMOR_SET_INDEXES.put(
@@ -1623,34 +1462,25 @@ public class AddonPackLoader implements RepositorySource {
                                 index
                         );
 
-                        if (index.helmet != null) {
-                            index.helmet.plateSlot =
-                                    false;
+                        prepareArmorIndex(
+                                index.helmet,
+                                namespace
+                        );
 
-                            index.helmet.packNamespace =
-                                    namespace;
-                        }
+                        prepareArmorIndex(
+                                index.chestplate,
+                                namespace
+                        );
 
-                        if (index.chestplate != null) {
-                            index.chestplate.packNamespace =
-                                    namespace;
-                        }
+                        prepareArmorIndex(
+                                index.leggings,
+                                namespace
+                        );
 
-                        if (index.leggings != null) {
-                            index.leggings.plateSlot =
-                                    false;
-
-                            index.leggings.packNamespace =
-                                    namespace;
-                        }
-
-                        if (index.boots != null) {
-                            index.boots.plateSlot =
-                                    false;
-
-                            index.boots.packNamespace =
-                                    namespace;
-                        }
+                        prepareArmorIndex(
+                                index.boots,
+                                namespace
+                        );
 
                         registerTaggedPiece(
                                 index.helmet,
@@ -1682,17 +1512,6 @@ public class AddonPackLoader implements RepositorySource {
                                 cmd
                         );
 
-                        /*
-                         * НИКАКОЙ регистрации Item здесь больше нет.
-                         *
-                         * Раньше здесь был:
-                         *
-                         * ItemRegistry.registerAddonArmor(...)
-                         *
-                         * Теперь Item создаётся только из items.json
-                         * во время RegisterEvent.
-                         */
-
                         JagTaczArmor.LOGGER.info(
                                 "Loaded armor definition: "
                                         + id
@@ -1702,6 +1521,7 @@ public class AddonPackLoader implements RepositorySource {
                         );
 
                     } catch (Exception e) {
+
                         JagTaczArmor.LOGGER.error(
                                 "Failed to load armor definition: "
                                         + jsonFile.getName(),
@@ -1717,21 +1537,83 @@ public class AddonPackLoader implements RepositorySource {
         );
     }
 
+    private static void assignArmorPiece(
+            ArmorSetIndex index,
+            ArmorIndex piece
+    ) {
+
+        if (
+                index == null
+                        || piece == null
+                        || piece.slot == null
+        ) {
+            return;
+        }
+
+        switch (
+                piece.slot.toLowerCase()
+        ) {
+
+            case "helmet":
+            case "head":
+                index.helmet = piece;
+                break;
+
+            case "chestplate":
+            case "chest":
+            case "torso":
+                index.chestplate = piece;
+                break;
+
+            case "leggings":
+            case "legs":
+                index.leggings = piece;
+                break;
+
+            case "boots":
+            case "feet":
+                index.boots = piece;
+                break;
+        }
+    }
+
+    private static void prepareArmorIndex(
+            ArmorIndex index,
+            String namespace
+    ) {
+
+        if (index == null) {
+            return;
+        }
+
+        index.packNamespace =
+                namespace;
+
+        if (
+                "helmet".equalsIgnoreCase(
+                        index.slot
+                )
+                        || "leggings".equalsIgnoreCase(
+                        index.slot
+                )
+        ) {
+            index.plateSlot =
+                    false;
+        }
+    }
+
     private static void loadPlatesFromPack(
             Path packPath
     ) {
+
         Path dataPath =
-                packPath.resolve("data");
+                packPath.resolve(
+                        "data"
+                );
 
         if (
-                !Files.exists(
-                        dataPath,
-                        new LinkOption[0]
-                )
-                        || !Files.isDirectory(
-                        dataPath,
-                        new LinkOption[0]
-                )
+                !Files.exists(dataPath)
+                        || !Files.isDirectory(dataPath)
         ) {
             return;
         }
@@ -1763,27 +1645,32 @@ public class AddonPackLoader implements RepositorySource {
                     dataSubDir.exists()
                             && dataSubDir.isDirectory()
             ) {
-                plateDirs = new File[]{
-                        new File(
-                                dataSubDir,
-                                "plate"
-                        ),
-                        new File(
-                                dataSubDir,
-                                "plates"
-                        )
-                };
+
+                plateDirs =
+                        new File[]{
+                                new File(
+                                        dataSubDir,
+                                        "plate"
+                                ),
+                                new File(
+                                        dataSubDir,
+                                        "plates"
+                                )
+                        };
+
             } else {
-                plateDirs = new File[]{
-                        new File(
-                                namespaceDir,
-                                "plate"
-                        ),
-                        new File(
-                                namespaceDir,
-                                "plates"
-                        )
-                };
+
+                plateDirs =
+                        new File[]{
+                                new File(
+                                        namespaceDir,
+                                        "plate"
+                                ),
+                                new File(
+                                        namespaceDir,
+                                        "plates"
+                                )
+                        };
             }
 
             for (File platesDir :
@@ -1815,57 +1702,61 @@ public class AddonPackLoader implements RepositorySource {
                                             jsonFile
                                     )
                     ) {
+
                         PlateIndex plate =
                                 GSON.fromJson(
                                         reader,
                                         PlateIndex.class
                                 );
 
-                        if (plate != null) {
-                            String plateName =
-                                    jsonFile.getName()
-                                            .replace(
-                                                    ".json",
-                                                    ""
-                                            );
-
-                            ResourceLocation id =
-                                    new ResourceLocation(
-                                            namespace,
-                                            plateName
-                                    );
-
-                            plate.packNamespace =
-                                    namespace;
-
-                            plate.registryName =
-                                    id.toString();
-
-                            PLATE_INDEXES.put(
-                                    id,
-                                    plate
-                            );
-
-                            int cmd =
-                                    getOrCreatePlateCmd(
-                                            id
-                                    );
-
-                            registerPlateCmdTexture(
-                                    plate,
-                                    cmd
-                            );
-
-                            JagTaczArmor.LOGGER.info(
-                                    "Loaded plate definition: "
-                                            + id
-                                            + " (CMD="
-                                            + cmd
-                                            + ")"
-                            );
+                        if (plate == null) {
+                            continue;
                         }
 
+                        String plateName =
+                                jsonFile.getName()
+                                        .replace(
+                                                ".json",
+                                                ""
+                                        );
+
+                        ResourceLocation id =
+                                new ResourceLocation(
+                                        namespace,
+                                        plateName
+                                );
+
+                        plate.packNamespace =
+                                namespace;
+
+                        plate.registryName =
+                                id.toString();
+
+                        PLATE_INDEXES.put(
+                                id,
+                                plate
+                        );
+
+                        int cmd =
+                                getOrCreatePlateCmd(
+                                        id
+                                );
+
+                        registerPlateCmdTexture(
+                                plate,
+                                cmd
+                        );
+
+                        JagTaczArmor.LOGGER.info(
+                                "Loaded plate definition: "
+                                        + id
+                                        + " (CMD="
+                                        + cmd
+                                        + ")"
+                        );
+
                     } catch (Exception e) {
+
                         JagTaczArmor.LOGGER.error(
                                 "Failed to load plate definition: "
                                         + jsonFile.getName(),
@@ -1881,6 +1772,7 @@ public class AddonPackLoader implements RepositorySource {
             PlateIndex plate,
             int cmd
     ) {
+
         if (plate.itemTexture == null) {
             return;
         }
@@ -1889,6 +1781,7 @@ public class AddonPackLoader implements RepositorySource {
                 plate.itemTexture;
 
         if (tex.contains(":textures/")) {
+
             tex =
                     tex.replace(
                             ":textures/",
@@ -1897,6 +1790,7 @@ public class AddonPackLoader implements RepositorySource {
         }
 
         if (tex.endsWith(".png")) {
+
             tex =
                     tex.substring(
                             0,
@@ -1914,8 +1808,11 @@ public class AddonPackLoader implements RepositorySource {
             File zipFile,
             String packName
     ) {
-        try (ZipFile zip =
-                     new ZipFile(zipFile)) {
+
+        try (
+                ZipFile zip =
+                        new ZipFile(zipFile)
+        ) {
 
             Enumeration<? extends ZipEntry> entries =
                     zip.entries();
@@ -1930,23 +1827,20 @@ public class AddonPackLoader implements RepositorySource {
             }
 
             entryList.sort(
-                    (a, b) ->
-                            a.getName().compareTo(
-                                    b.getName()
-                            )
+                    Comparator.comparing(
+                            ZipEntry::getName
+                    )
             );
 
             for (ZipEntry entry :
                     entryList) {
 
                 String name =
-                        entry.getName();
-
-                name =
-                        name.replace(
-                                "\\",
-                                "/"
-                        );
+                        entry.getName()
+                                .replace(
+                                        "\\",
+                                        "/"
+                                );
 
                 if (name.startsWith("/")) {
                     name =
@@ -1970,9 +1864,6 @@ public class AddonPackLoader implements RepositorySource {
                 boolean valid = false;
                 boolean isPlate = false;
 
-                /*
-                 * data/<namespace>/armors/file.json
-                 */
                 if (
                         parts.length == 4
                                 && (
@@ -1980,6 +1871,7 @@ public class AddonPackLoader implements RepositorySource {
                                         || parts[2].equals("armor")
                         )
                 ) {
+
                     namespace =
                             parts[1];
 
@@ -1988,9 +1880,6 @@ public class AddonPackLoader implements RepositorySource {
 
                     valid = true;
 
-                    /*
-                     * data/<namespace>/data/armors/file.json
-                     */
                 } else if (
                         parts.length == 5
                                 && parts[2].equals("data")
@@ -1999,6 +1888,7 @@ public class AddonPackLoader implements RepositorySource {
                                         || parts[3].equals("armor")
                         )
                 ) {
+
                     namespace =
                             parts[1];
 
@@ -2007,9 +1897,6 @@ public class AddonPackLoader implements RepositorySource {
 
                     valid = true;
 
-                    /*
-                     * data/<namespace>/plate/file.json
-                     */
                 } else if (
                         parts.length == 4
                                 && (
@@ -2017,6 +1904,7 @@ public class AddonPackLoader implements RepositorySource {
                                         || parts[2].equals("plates")
                         )
                 ) {
+
                     namespace =
                             parts[1];
 
@@ -2026,9 +1914,6 @@ public class AddonPackLoader implements RepositorySource {
                     valid = true;
                     isPlate = true;
 
-                    /*
-                     * data/<namespace>/data/plate/file.json
-                     */
                 } else if (
                         parts.length == 5
                                 && parts[2].equals("data")
@@ -2037,6 +1922,7 @@ public class AddonPackLoader implements RepositorySource {
                                         || parts[3].equals("plates")
                         )
                 ) {
+
                     namespace =
                             parts[1];
 
@@ -2056,6 +1942,7 @@ public class AddonPackLoader implements RepositorySource {
                 }
 
                 if (isPlate) {
+
                     loadPlateFromZipEntry(
                             zip,
                             entry,
@@ -2063,7 +1950,9 @@ public class AddonPackLoader implements RepositorySource {
                             filename,
                             name
                     );
+
                 } else {
+
                     loadArmorFromZipEntry(
                             zip,
                             entry,
@@ -2076,6 +1965,7 @@ public class AddonPackLoader implements RepositorySource {
             }
 
         } catch (Exception e) {
+
             JagTaczArmor.LOGGER.error(
                     "Failed to load armors from zip pack: "
                             + zipFile.getName(),
@@ -2091,6 +1981,7 @@ public class AddonPackLoader implements RepositorySource {
             String filename,
             String entryName
     ) {
+
         String plateName =
                 filename.substring(
                         0,
@@ -2113,6 +2004,7 @@ public class AddonPackLoader implements RepositorySource {
                                 StandardCharsets.UTF_8
                         )
         ) {
+
             PlateIndex plate =
                     GSON.fromJson(
                             reader,
@@ -2153,6 +2045,7 @@ public class AddonPackLoader implements RepositorySource {
             );
 
         } catch (Exception e) {
+
             JagTaczArmor.LOGGER.error(
                     "Failed to load plate definition from zip: "
                             + entryName,
@@ -2169,6 +2062,7 @@ public class AddonPackLoader implements RepositorySource {
             String entryName,
             String packName
     ) {
+
         String armorSetName =
                 filename.substring(
                         0,
@@ -2191,6 +2085,7 @@ public class AddonPackLoader implements RepositorySource {
                                 StandardCharsets.UTF_8
                         )
         ) {
+
             JsonElement element =
                     JsonParser.parseReader(
                             reader
@@ -2206,6 +2101,7 @@ public class AddonPackLoader implements RepositorySource {
             ArmorSetIndex index;
 
             if (obj.has("slot")) {
+
                 ArmorIndex piece =
                         GSON.fromJson(
                                 obj,
@@ -2219,50 +2115,28 @@ public class AddonPackLoader implements RepositorySource {
                         piece.displayName;
 
                 if (
-                        (nameToUse == null
+                        nameToUse == null
                                 || "Custom Armor".equals(
-                                nameToUse))
-                                && piece.name != null
+                                nameToUse
+                        )
                 ) {
-                    nameToUse =
-                            piece.name;
+
+                    if (piece.name != null) {
+                        nameToUse =
+                                piece.name;
+                    }
                 }
 
                 index.name =
                         nameToUse;
 
-                if (piece.slot != null) {
-                    switch (
-                            piece.slot.toLowerCase()
-                    ) {
-                        case "helmet":
-                        case "head":
-                            index.helmet =
-                                    piece;
-                            break;
-
-                        case "chestplate":
-                        case "torso":
-                        case "chest":
-                            index.chestplate =
-                                    piece;
-                            break;
-
-                        case "leggings":
-                        case "legs":
-                            index.leggings =
-                                    piece;
-                            break;
-
-                        case "boots":
-                        case "feet":
-                            index.boots =
-                                    piece;
-                            break;
-                    }
-                }
+                assignArmorPiece(
+                        index,
+                        piece
+                );
 
             } else {
+
                 index =
                         GSON.fromJson(
                                 obj,
@@ -2275,36 +2149,25 @@ public class AddonPackLoader implements RepositorySource {
                     index
             );
 
-            if (index.helmet != null) {
-                index.helmet.plateSlot =
-                        false;
-            }
+            prepareArmorIndex(
+                    index.helmet,
+                    namespace
+            );
 
-            if (index.chestplate != null) {
-                index.chestplate.packNamespace =
-                        namespace;
-            }
+            prepareArmorIndex(
+                    index.chestplate,
+                    namespace
+            );
 
-            if (index.helmet != null) {
-                index.helmet.packNamespace =
-                        namespace;
-            }
+            prepareArmorIndex(
+                    index.leggings,
+                    namespace
+            );
 
-            if (index.leggings != null) {
-                index.leggings.plateSlot =
-                        false;
-
-                index.leggings.packNamespace =
-                        namespace;
-            }
-
-            if (index.boots != null) {
-                index.boots.plateSlot =
-                        false;
-
-                index.boots.packNamespace =
-                        namespace;
-            }
+            prepareArmorIndex(
+                    index.boots,
+                    namespace
+            );
 
             registerTaggedPiece(
                     index.helmet,
@@ -2336,13 +2199,6 @@ public class AddonPackLoader implements RepositorySource {
                     cmd
             );
 
-            /*
-             * НИКАКОЙ регистрации Item здесь нет.
-             *
-             * Предметы создаются из items.json
-             * в RegisterEvent.
-             */
-
             JagTaczArmor.LOGGER.info(
                     "Loaded armor definition from zip: "
                             + id
@@ -2352,6 +2208,7 @@ public class AddonPackLoader implements RepositorySource {
             );
 
         } catch (Exception e) {
+
             JagTaczArmor.LOGGER.error(
                     "Failed to load armor definition from zip: "
                             + entryName,
@@ -2364,17 +2221,29 @@ public class AddonPackLoader implements RepositorySource {
             ArmorIndex piece,
             String packName
     ) {
+
         if (piece == null) {
             return;
         }
 
-        piece.packNamespace =
-                packName;
+        /*
+         * Важно:
+         * packNamespace должен быть namespace,
+         * а не обязательно имя папки pack.
+         */
+        if (
+                piece.packNamespace == null
+                        || piece.packNamespace.isEmpty()
+        ) {
+            piece.packNamespace =
+                    packName;
+        }
 
         if (
                 piece.armorTag != null
                         && !piece.armorTag.trim().isEmpty()
         ) {
+
             TAGGED_ARMORS.put(
                     piece.armorTag.trim(),
                     piece
@@ -2386,6 +2255,7 @@ public class AddonPackLoader implements RepositorySource {
             ArmorSetIndex setIndex,
             int cmd
     ) {
+
         ArmorIndex[] pieces =
                 new ArmorIndex[]{
                         setIndex.helmet,
@@ -2397,16 +2267,20 @@ public class AddonPackLoader implements RepositorySource {
         Map<Integer, String> texMap =
                 new HashMap<>();
 
-        for (int i = 0; i < pieces.length; ++i) {
+        for (int i = 0;
+             i < pieces.length;
+             ++i) {
 
             if (
                     pieces[i] != null
                             && pieces[i].itemTexture != null
             ) {
+
                 String tex =
                         pieces[i].itemTexture;
 
                 if (tex.contains(":textures/")) {
+
                     tex =
                             tex.replace(
                                     ":textures/",
@@ -2422,6 +2296,7 @@ public class AddonPackLoader implements RepositorySource {
         }
 
         if (!texMap.isEmpty()) {
+
             CMD_TEXTURES.put(
                     cmd,
                     texMap
@@ -2432,6 +2307,7 @@ public class AddonPackLoader implements RepositorySource {
     public void loadPacks(
             Consumer<Pack> pOnLoad
     ) {
+
         reloadPacks();
 
         Pack clientPack =
@@ -2441,7 +2317,7 @@ public class AddonPackLoader implements RepositorySource {
                                 "JagTaczArmor Resources"
                         ),
                         true,
-                        (id) ->
+                        id ->
                                 new DelegatingPackResources(
                                         id,
                                         true,
@@ -2477,7 +2353,7 @@ public class AddonPackLoader implements RepositorySource {
                                 "JagTaczArmor Data"
                         ),
                         true,
-                        (id) ->
+                        id ->
                                 new DelegatingPackResources(
                                         id,
                                         true,
@@ -2511,6 +2387,7 @@ public class AddonPackLoader implements RepositorySource {
     public static void onAddReloadListener(
             AddReloadListenerEvent event
     ) {
+
         event.addListener(
                 (ResourceManagerReloadListener)
                         manager ->
@@ -2519,6 +2396,7 @@ public class AddonPackLoader implements RepositorySource {
     }
 
     public static class PackMeta {
+
         public String name;
         public String author;
 
@@ -2539,6 +2417,7 @@ public class AddonPackLoader implements RepositorySource {
         public static void onAddPackFinders(
                 AddPackFindersEvent event
         ) {
+
             event.addRepositorySource(
                     AddonPackLoader.INSTANCE
             );
@@ -2548,6 +2427,7 @@ public class AddonPackLoader implements RepositorySource {
         public static void onRegisterClientReloadListeners(
                 RegisterClientReloadListenersEvent event
         ) {
+
             event.registerReloadListener(
                     (ResourceManagerReloadListener)
                             manager ->
