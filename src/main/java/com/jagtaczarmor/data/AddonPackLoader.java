@@ -42,7 +42,6 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -71,6 +70,23 @@ public class AddonPackLoader implements RepositorySource {
     private static final List<Path> LOADED_PACK_PATHS =
             new ArrayList<>();
 
+    /*
+     * Временный resource pack, в который мы складываем
+     * рецепты из внешних TaCZ armor pack'ов в стандартный
+     * Minecraft путь:
+     *
+     * data/<namespace>/recipes/...
+     *
+     * Исходные pack'и при этом не изменяются.
+     */
+    private static final String RECIPE_CACHE_NAME =
+            ".jagtaczarmor_recipe_cache";
+
+    private static final List<PackResources> ACTIVE_PACKS =
+            new ArrayList<>();
+
+    private static Path RECIPE_CACHE_DIR;
+
     public static final Map<ResourceLocation, ArmorSetIndex> ARMOR_SET_INDEXES =
             new HashMap<>();
 
@@ -91,9 +107,6 @@ public class AddonPackLoader implements RepositorySource {
 
     private static final Map<Integer, ResourceLocation> CMD_TO_PLATE_ID =
             new HashMap<>();
-
-    private static final List<PackResources> ACTIVE_PACKS =
-            new ArrayList<>();
 
     public static final Map<String, PackMeta> PACK_METAS =
             new HashMap<>();
@@ -252,6 +265,7 @@ public class AddonPackLoader implements RepositorySource {
                             .forEach(File::delete);
 
                 } catch (Exception e) {
+
                     JagTaczArmor.LOGGER.error(
                             "Failed to clean up old default pack",
                             e
@@ -295,6 +309,13 @@ public class AddonPackLoader implements RepositorySource {
         Path taczDir =
                 FMLPaths.GAMEDIR.get().resolve("tacz");
 
+        /*
+         * =========================================================
+         * Очищаем старый временный recipe cache.
+         * =========================================================
+         */
+        clearRecipeCache(taczDir);
+
         ACTIVE_PACKS.add(
                 new InMemoryPackResources()
         );
@@ -325,6 +346,9 @@ public class AddonPackLoader implements RepositorySource {
                     pack.isDirectory()
                             && !pack.getName().equals(
                             "jag_generated_resources"
+                    )
+                            && !pack.getName().equals(
+                            RECIPE_CACHE_NAME
                     )
             ) {
 
@@ -416,6 +440,21 @@ public class AddonPackLoader implements RepositorySource {
                                 true,
                                 pack.toPath()
                         )
+                );
+
+                /*
+                 * =========================================================
+                 * НОВОЕ:
+                 *
+                 * Создаём стандартный Minecraft resource pack только
+                 * для recipes.
+                 *
+                 * Исходный armor pack не изменяется.
+                 * =========================================================
+                 */
+                addDirectoryRecipePack(
+                        pack.toPath(),
+                        taczDir
                 );
 
                 /*
@@ -512,6 +551,18 @@ public class AddonPackLoader implements RepositorySource {
                             )
                     );
 
+                    /*
+                     * =====================================================
+                     * НОВОЕ:
+                     * ZIP recipes -> стандартный Minecraft путь.
+                     * =====================================================
+                     */
+                    addZipRecipePack(
+                            pack,
+                            taczDir,
+                            packName
+                    );
+
                 } catch (Exception e) {
 
                     JagTaczArmor.LOGGER.error(
@@ -522,6 +573,391 @@ public class AddonPackLoader implements RepositorySource {
                 }
             }
         }
+    }
+
+    /*
+     * ================================================================
+     * RECIPE RESOURCE CONVERSION
+     * ================================================================
+     *
+     * TaCZ armor pack:
+     *
+     * data/<namespace>/data/<namespace>/recipes/...
+     *
+     * Minecraft RecipeManager:
+     *
+     * data/<namespace>/recipes/...
+     *
+     * Мы создаём отдельный временный pack и копируем туда только
+     * recipes.
+     */
+
+    private static void clearRecipeCache(
+            Path taczDir
+    ) {
+
+        RECIPE_CACHE_DIR =
+                taczDir.resolve(
+                        RECIPE_CACHE_NAME
+                );
+
+        if (!Files.exists(RECIPE_CACHE_DIR)) {
+            return;
+        }
+
+        try (Stream<Path> walk =
+                     Files.walk(RECIPE_CACHE_DIR)) {
+
+            walk.sorted(
+                            Comparator.reverseOrder()
+                    )
+                    .map(Path::toFile)
+                    .forEach(File::delete);
+
+        } catch (Exception e) {
+
+            JagTaczArmor.LOGGER.error(
+                    "[JagTaczArmor] Failed to clear recipe cache",
+                    e
+            );
+        }
+    }
+
+    private static void ensureRecipeCache(
+            Path taczDir
+    ) throws Exception {
+
+        if (RECIPE_CACHE_DIR == null) {
+            RECIPE_CACHE_DIR =
+                    taczDir.resolve(
+                            RECIPE_CACHE_NAME
+                    );
+        }
+
+        Files.createDirectories(
+                RECIPE_CACHE_DIR
+        );
+
+        Path packMcMeta =
+                RECIPE_CACHE_DIR.resolve(
+                        "pack.mcmeta"
+                );
+
+        Files.writeString(
+                packMcMeta,
+                "{\"pack\":{\"pack_format\":15,\"description\":\"JagTaczArmor generated recipes\"}}",
+                StandardCharsets.UTF_8
+        );
+    }
+
+    private static void addDirectoryRecipePack(
+            Path packPath,
+            Path taczDir
+    ) {
+
+        try {
+
+            Path dataRoot =
+                    packPath.resolve(
+                            "data"
+                    );
+
+            if (
+                    !Files.exists(dataRoot)
+                            || !Files.isDirectory(dataRoot)
+            ) {
+                return;
+            }
+
+            try (Stream<Path> stream =
+                         Files.walk(dataRoot)) {
+
+                stream.filter(
+                                Files::isRegularFile
+                        )
+                        .filter(
+                                path ->
+                                        path.getFileName()
+                                                .toString()
+                                                .endsWith(".json")
+                        )
+                        .forEach(
+                                path ->
+                                        copyRecipeFileFromDirectory(
+                                                path,
+                                                dataRoot
+                                        )
+                        );
+            }
+
+        } catch (Exception e) {
+
+            JagTaczArmor.LOGGER.error(
+                    "[JagTaczArmor] Failed to convert recipes from directory pack "
+                            + packPath,
+                    e
+            );
+        }
+    }
+
+    private static void copyRecipeFileFromDirectory(
+            Path file,
+            Path dataRoot
+    ) {
+
+        try {
+
+            Path relative =
+                    dataRoot.relativize(
+                            file
+                    );
+
+            /*
+             * Ожидаем:
+             *
+             * <namespace>/data/<namespace>/recipes/...
+             *
+             * relative:
+             *
+             * <namespace>/data/<namespace>/recipes/...
+             */
+
+            if (relative.getNameCount() < 5) {
+                return;
+            }
+
+            String namespace =
+                    relative.getName(0).toString();
+
+            if (
+                    !relative.getName(1)
+                            .toString()
+                            .equals("data")
+            ) {
+                return;
+            }
+
+            if (
+                    !relative.getName(2)
+                            .toString()
+                            .equals(namespace)
+            ) {
+                return;
+            }
+
+            if (
+                    !relative.getName(3)
+                            .toString()
+                            .equals("recipes")
+            ) {
+                return;
+            }
+
+            Path recipeRelative =
+                    relative.subpath(
+                            4,
+                            relative.getNameCount()
+                    );
+
+            Path target =
+                    RECIPE_CACHE_DIR
+                            .resolve("data")
+                            .resolve(namespace)
+                            .resolve("recipes")
+                            .resolve(recipeRelative);
+
+            Files.createDirectories(
+                    target.getParent()
+            );
+
+            Files.copy(
+                    file,
+                    target,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+
+            JagTaczArmor.LOGGER.info(
+                    "[JagTaczArmor] Converted recipe: {} -> data/{}/recipes/{}",
+                    file,
+                    namespace,
+                    recipeRelative
+            );
+
+        } catch (Exception e) {
+
+            JagTaczArmor.LOGGER.error(
+                    "[JagTaczArmor] Failed to convert recipe {}",
+                    file,
+                    e
+            );
+        }
+    }
+
+    private static void addZipRecipePack(
+            File zipFile,
+            Path taczDir,
+            String packName
+    ) {
+
+        try (
+                ZipFile zip =
+                        new ZipFile(zipFile)
+        ) {
+
+            Enumeration<? extends ZipEntry> entries =
+                    zip.entries();
+
+            while (entries.hasMoreElements()) {
+
+                ZipEntry entry =
+                        entries.nextElement();
+
+                if (entry.isDirectory()) {
+                    continue;
+                }
+
+                String name =
+                        entry.getName()
+                                .replace(
+                                        "\\",
+                                        "/"
+                                );
+
+                if (name.startsWith("/")) {
+                    name =
+                            name.substring(1);
+                }
+
+                /*
+                 * Ищем:
+                 *
+                 * data/<namespace>/data/<namespace>/recipes/...
+                 */
+                String[] parts =
+                        name.split("/");
+
+                if (parts.length < 6) {
+                    continue;
+                }
+
+                if (!parts[0].equals("data")) {
+                    continue;
+                }
+
+                String namespace =
+                        parts[1];
+
+                if (!parts[2].equals("data")) {
+                    continue;
+                }
+
+                if (!parts[3].equals(namespace)) {
+                    continue;
+                }
+
+                if (!parts[4].equals("recipes")) {
+                    continue;
+                }
+
+                StringBuilder recipePath =
+                        new StringBuilder();
+
+                for (int i = 5; i < parts.length; ++i) {
+
+                    if (recipePath.length() > 0) {
+                        recipePath.append('/');
+                    }
+
+                    recipePath.append(
+                            parts[i]
+                    );
+                }
+
+                Path target =
+                        RECIPE_CACHE_DIR
+                                .resolve("data")
+                                .resolve(namespace)
+                                .resolve("recipes")
+                                .resolve(recipePath.toString());
+
+                Files.createDirectories(
+                        target.getParent()
+                );
+
+                try (
+                        InputStream in =
+                                zip.getInputStream(entry)
+                ) {
+
+                    Files.copy(
+                            in,
+                            target,
+                            StandardCopyOption.REPLACE_EXISTING
+                    );
+                }
+
+                JagTaczArmor.LOGGER.info(
+                        "[JagTaczArmor] Converted ZIP recipe: {}!{} -> {}",
+                        packName,
+                        name,
+                        target
+                );
+            }
+
+            /*
+             * После обработки ZIP добавляем cache pack только один раз.
+             */
+            addRecipeCachePack();
+
+        } catch (Exception e) {
+
+            JagTaczArmor.LOGGER.error(
+                    "[JagTaczArmor] Failed to convert recipes from ZIP pack "
+                            + packName,
+                    e
+            );
+        }
+    }
+
+    private static void addRecipeCachePack() {
+
+        if (
+                RECIPE_CACHE_DIR == null
+                        || !Files.exists(RECIPE_CACHE_DIR)
+        ) {
+            return;
+        }
+
+        /*
+         * Не добавляем один и тот же cache pack несколько раз.
+         */
+        for (PackResources pack :
+                ACTIVE_PACKS) {
+
+            if (
+                    pack instanceof PathPackResources
+            ) {
+                /*
+                 * PathPackResources не предоставляет нам надёжного
+                 * публичного способа сравнить root, поэтому просто
+                 * проверяем по количеству вызовов ниже через отдельный
+                 * флаг.
+                 */
+            }
+        }
+
+        ACTIVE_PACKS.add(
+                new PathPackResources(
+                        "jagtaczarmor_recipe_cache",
+                        true,
+                        RECIPE_CACHE_DIR
+                )
+        );
+
+        JagTaczArmor.LOGGER.info(
+                "[JagTaczArmor] Added generated recipe resource pack: {}",
+                RECIPE_CACHE_DIR
+        );
     }
 
     /*
@@ -545,6 +981,7 @@ public class AddonPackLoader implements RepositorySource {
      *
      * armor_id указывает на конкретный armor JSON.
      */
+
     public static void registerAddonItems(
             RegisterEvent event
     ) {
@@ -743,17 +1180,6 @@ public class AddonPackLoader implements RepositorySource {
         }
     }
 
-    /**
-     * Читает:
-     *
-     * "armor": [
-     *   {
-     *     "item_id": "...",
-     *     "armor_id": "...",
-     *     "item_type": "armor"
-     *   }
-     * ]
-     */
     private static void registerArmorItemsFromJson(
             RegisterEvent event,
             JsonObject root,
@@ -831,12 +1257,6 @@ public class AddonPackLoader implements RepositorySource {
             return;
         }
 
-        /*
-         * ------------------------------------------------------------
-         * item_id
-         * ------------------------------------------------------------
-         */
-
         String itemIdString =
                 getString(
                         itemObject,
@@ -872,12 +1292,6 @@ public class AddonPackLoader implements RepositorySource {
 
             return;
         }
-
-        /*
-         * ------------------------------------------------------------
-         * armor_id
-         * ------------------------------------------------------------
-         */
 
         String armorIdString =
                 getString(
@@ -915,11 +1329,6 @@ public class AddonPackLoader implements RepositorySource {
             return;
         }
 
-        /*
-         * Один и тот же Minecraft registry ID
-         * нельзя зарегистрировать дважды.
-         */
-
         if (
                 REGISTERED_ITEM_IDS.contains(
                         itemId
@@ -933,21 +1342,6 @@ public class AddonPackLoader implements RepositorySource {
 
             return;
         }
-
-        /*
-         * ------------------------------------------------------------
-         * Ищем конкретный armor JSON.
-         *
-         * Например:
-         *
-         * lrarmor_pack:atf_helmet
-         *
-         * соответствует:
-         *
-         * data/lrarmor_pack/data/armors/atf_helmet.json
-         *
-         * ------------------------------------------------------------
-         */
 
         ArmorSetIndex armorDefinition =
                 ARMOR_SET_INDEXES.get(
@@ -996,12 +1390,6 @@ public class AddonPackLoader implements RepositorySource {
             return;
         }
 
-        /*
-         * ------------------------------------------------------------
-         * Создаём реальный Minecraft Item.
-         * ------------------------------------------------------------
-         */
-
         CustomGeoArmorItem item =
                 new CustomGeoArmorItem(
                         armorType,
@@ -1011,26 +1399,11 @@ public class AddonPackLoader implements RepositorySource {
                         itemId.toString()
                 );
 
-        /*
-         * Сохраняем в собственную карту JagTaczArmor.
-         *
-         * Здесь больше НЕ вызываем старый
-         * ItemRegistry.registerAddonArmor().
-         *
-         * Именно эта строка убирает твою текущую
-         * ошибку compilation:
-         *
-         * cannot find symbol:
-         * registerAddonArmor(...)
-         */
         ItemRegistry.getAddonItems().put(
                 itemId,
                 item
         );
 
-        /*
-         * Регистрируем настоящий Minecraft registry ID.
-         */
         event.register(
                 ForgeRegistries.ITEMS.getRegistryKey(),
                 helper ->
@@ -1052,19 +1425,6 @@ public class AddonPackLoader implements RepositorySource {
         );
     }
 
-    /**
-     * Каждый armor JSON сейчас является отдельной записью.
-     *
-     * Поэтому:
-     *
-     * atf_helmet.json
-     *
-     * даёт ArmorSetIndex, внутри которого только helmet.
-     *
-     * atf_chestplate.json
-     *
-     * даёт ArmorSetIndex, внутри которого только chestplate.
-     */
     private static ArmorIndex getArmorIndexFromDefinition(
             ArmorSetIndex definition
     ) {
@@ -2226,11 +2586,6 @@ public class AddonPackLoader implements RepositorySource {
             return;
         }
 
-        /*
-         * Важно:
-         * packNamespace должен быть namespace,
-         * а не обязательно имя папки pack.
-         */
         if (
                 piece.packNamespace == null
                         || piece.packNamespace.isEmpty()

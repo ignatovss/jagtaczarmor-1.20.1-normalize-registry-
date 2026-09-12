@@ -45,6 +45,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
@@ -668,26 +669,11 @@ public class DamageEventHandler {
                                             ? event.getHeadshotMultiplier()
                                             : 1.0F;
 
-                            /*
-                             * This is the damage after the custom
-                             * ammo-immunity reduction.
-                             *
-                             * We intentionally pass this value to
-                             * entity.hurt(). Minecraft will then apply
-                             * the normal vanilla armor calculation once.
-                             */
                             float modReducedDamage =
                                     event.getBaseAmount()
                                             * multiplier
                                             * (1.0F - reduction);
 
-                            /*
-                             * Diagnostic only.
-                             *
-                             * Do NOT pass this value to hurt(), because
-                             * LivingEntity.hurt() performs vanilla armor
-                             * reduction itself.
-                             */
                             float armorValue =
                                     entity.getArmorValue();
 
@@ -741,11 +727,6 @@ public class DamageEventHandler {
                                 );
                             }
 
-                            /*
-                             * The original TaCZ event must not continue
-                             * into its normal damage path, because we are
-                             * manually applying the modified damage.
-                             */
                             event.setBaseAmount(0.0F);
 
                             if (modReducedDamage > 0.0F) {
@@ -874,16 +855,6 @@ public class DamageEventHandler {
 
                                     try {
 
-                                        /*
-                                         * TaCZ itself does this before
-                                         * applying both damage components.
-                                         *
-                                         * Mohist can preserve the normal
-                                         * LivingEntity invulnerability
-                                         * timer between hits. Our custom
-                                         * manual hurt() must therefore
-                                         * behave the same way as TaCZ.
-                                         */
                                         entity.invulnerableTime = 0;
 
                                         if (debugMode) {
@@ -1899,7 +1870,7 @@ public class DamageEventHandler {
                                     : entity.position()
                                     .add(
                                             0.0D,
-                                            entity.getBbHeight() / 2.0F,
+                                            entity.getBbHeight() / 2.0D,
                                             0.0D
                                     );
 
@@ -2437,10 +2408,29 @@ public class DamageEventHandler {
                     "plate_enchantments"
             )) {
 
-                ItemStack tempPlateStack =
-                        new ItemStack(
-                                ItemRegistry.PLATE_ARMOR.get()
+                ResourceLocation plateResourceId =
+                        chestplate.hasTag()
+                                && chestplate.getTag().contains("plate_id")
+                                ? new ResourceLocation(
+                                chestplate.getTag().getString("plate_id")
+                        )
+                                : null;
+
+                if (plateResourceId == null) {
+                    return;
+                }
+
+                Item plateItem =
+                        ItemRegistry.getPlateItem(
+                                plateResourceId
                         );
+
+                if (plateItem == null) {
+                    return;
+                }
+
+                ItemStack tempPlateStack =
+                        new ItemStack(plateItem);
 
                 tempPlateStack.getOrCreateTag().put(
                         "Enchantments",
@@ -2733,22 +2723,6 @@ public class DamageEventHandler {
                     bulletKnockback
             );
 
-            /*
-             * IMPORTANT:
-             *
-             * invulnerableTime is reset immediately before
-             * the actual hurt() call.
-             *
-             * TaCZ does the same thing in EntityKineticBullet:
-             *
-             *     parts.core().invulnerableTime = 0;
-             *     parts.hitPart().hurt(...);
-             *
-             * Without this reset, consecutive bullets can be
-             * ignored by LivingEntity.hurt() because the entity
-             * is still inside Minecraft's normal hurt immunity
-             * window.
-             */
             entity.invulnerableTime = 0;
 
             if (debugMode) {
@@ -3016,10 +2990,20 @@ public class DamageEventHandler {
                 if (plateIndex != null
                         && curDur < plateIndex.durability) {
 
-                    ItemStack plateStack =
-                            new ItemStack(
-                                    ItemRegistry.PLATE_ARMOR.get()
+                    ResourceLocation plateResourceId =
+                            new ResourceLocation(plateId);
+
+                    Item plateItem =
+                            ItemRegistry.getPlateItem(
+                                    plateResourceId
                             );
+
+                    if (plateItem == null) {
+                        return;
+                    }
+
+                    ItemStack plateStack =
+                            new ItemStack(plateItem);
 
                     plateStack.getOrCreateTag()
                             .putString(

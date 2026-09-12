@@ -6,6 +6,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.RegistryObject;
@@ -47,27 +48,12 @@ public class CreativeTabRegistry {
                                      * =====================================================
                                      * ARMOR ITEMS FROM ADDON PACKS
                                      * =====================================================
-                                     *
-                                     * Теперь каждый armor item имеет собственный
-                                     * Minecraft registry ID.
-                                     *
-                                     * Например:
-                                     *
-                                     * jag_default_armor:tactical_armor_helmet
-                                     * jag_default_armor:tactical_armor_chestplate
-                                     * jag_default_armor:tactical_armor_leggings
-                                     * jag_default_armor:tactical_armor_boots
-                                     *
-                                     * Поэтому больше нельзя строить item ID из
-                                     * ArmorSetIndex.getPath().
-                                     *
-                                     * Берём непосредственно зарегистрированные
-                                     * addon items из ItemRegistry.
                                      */
                                     for (
                                             Map.Entry<ResourceLocation, CustomGeoArmorItem> entry :
                                             ItemRegistry.getAddonItems().entrySet()
                                     ) {
+
                                         CustomGeoArmorItem item =
                                                 entry.getValue();
 
@@ -98,27 +84,62 @@ public class CreativeTabRegistry {
                                      * =====================================================
                                      * PLATES
                                      * =====================================================
+                                     *
+                                     * Теперь каждая плита является отдельным
+                                     * Minecraft Item.
+                                     *
+                                     * Например:
+                                     *
+                                     * jag_default_armor:ceramic_plate
+                                     * lrarmor_pack:steel_plate
+                                     *
+                                     * Поэтому больше НЕ создаём:
+                                     *
+                                     * jagtaczarmor:plate_armor
+                                     *
+                                     * и НЕ используем plate_id для определения
+                                     * самого Item.
                                      */
                                     for (
                                             ResourceLocation plateId :
                                             AddonPackLoader.PLATE_INDEXES.keySet()
                                     ) {
-                                        ItemStack plate =
-                                                new ItemStack(
-                                                        ItemRegistry.PLATE_ARMOR.get()
+
+                                        Item plateItem =
+                                                ItemRegistry.getPlateItem(
+                                                        plateId
                                                 );
 
+                                        if (plateItem == null) {
+
+                                            continue;
+                                        }
+
+                                        ItemStack plate =
+                                                new ItemStack(
+                                                        plateItem
+                                                );
+
+                                        /*
+                                         * Оставляем plate_id в NBT
+                                         * для совместимости со старой системой
+                                         * и существующими сохранёнными предметами.
+                                         */
                                         plate.getOrCreateTag().putString(
                                                 "plate_id",
                                                 plateId.toString()
                                         );
 
+                                        /*
+                                         * CustomModelData также сохраняем.
+                                         */
                                         Integer cmd =
                                                 AddonPackLoader.PLATE_CMD.get(
                                                         plateId
                                                 );
 
                                         if (cmd != null) {
+
                                             plate.getOrCreateTag().putInt(
                                                     "CustomModelData",
                                                     cmd
