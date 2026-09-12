@@ -7,7 +7,6 @@ import com.jagtaczarmor.item.CustomPlateItem;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ArmorItem.Type;
 import net.minecraft.world.item.Item;
-
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.DeferredRegister;
@@ -16,9 +15,7 @@ import net.minecraftforge.registries.RegisterEvent;
 import net.minecraftforge.registries.RegistryObject;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 @Mod.EventBusSubscriber(
         modid = "jagtaczarmor",
@@ -32,36 +29,29 @@ public class ItemRegistry {
     public static final RegistryObject<Item> CUSTOM_CHESTPLATE;
     public static final RegistryObject<Item> CUSTOM_LEGGINGS;
     public static final RegistryObject<Item> CUSTOM_BOOTS;
-
     public static final RegistryObject<Item> TAB_ICON;
     public static final RegistryObject<Item> PLATE_ARMOR;
 
     /**
-     * Динамические предметы из armor pack'ов.
+     * Динамические armor items из armor pack'ов.
      *
-     * Ключ:
-     *     полный registry ID предмета
+     * Ключ карты — полный Minecraft registry ID.
      *
      * Например:
-     *     my_pack:tactical_helmet
+     *
+     * jag_default_armor:tactical_armor_helmet
+     * jag_default_armor:tactical_armor_chestplate
      */
-    private static final Map<ResourceLocation, Item> ADDON_ITEMS = new HashMap<>();
+    private static final Map<ResourceLocation, CustomGeoArmorItem> ADDON_ITEMS =
+            new HashMap<>();
 
-    /**
-     * Уже зарегистрированные динамические предметы.
-     */
-    private static final Set<ResourceLocation> REGISTERED_DYNAMIC_ITEMS = new HashSet<>();
-
-    public ItemRegistry() {
+    private ItemRegistry() {
     }
 
     /**
-     * Регистрация динамического armor item.
+     * Сохраняет динамический armor item в нашей карте.
      *
-     * В отличие от старой версии здесь namespace больше
-     * не привязан к "jagtaczarmor".
-     *
-     * Реальный ID приходит из items.json.
+     * Фактическая регистрация в Forge registry происходит через RegisterEvent.
      */
     public static void registerAddonArmor(
             ResourceLocation itemId,
@@ -71,36 +61,54 @@ public class ItemRegistry {
             return;
         }
 
-        if (!REGISTERED_DYNAMIC_ITEMS.add(itemId)) {
-            return;
-        }
-
         ADDON_ITEMS.put(itemId, item);
     }
 
     /**
-     * Получить динамический предмет по полному registry ID.
+     * Получить динамический armor item по полному registry ID.
      */
-    public static Item getAddonItem(ResourceLocation id) {
-        return ADDON_ITEMS.get(id);
+    public static CustomGeoArmorItem getAddonItem(
+            ResourceLocation itemId
+    ) {
+        if (itemId == null) {
+            return null;
+        }
+
+        return ADDON_ITEMS.get(itemId);
     }
 
     /**
-     * Проверка динамического armor item.
+     * Проверить, является ли ID динамическим armor item.
      */
-    public static boolean isAddonArmor(ResourceLocation id) {
-        return id != null && ADDON_ITEMS.containsKey(id);
+    public static boolean isAddonArmor(
+            ResourceLocation itemId
+    ) {
+        return itemId != null && ADDON_ITEMS.containsKey(itemId);
     }
 
     /**
-     * Регистрация динамических предметов из armor pack'ов.
+     * Получить все динамические armor items.
+     */
+    public static Map<ResourceLocation, CustomGeoArmorItem> getAddonItems() {
+        return ADDON_ITEMS;
+    }
+
+    /**
+     * Forge registry event.
      *
-     * Сам список предметов берётся из items.json через AddonPackLoader.
+     * Здесь AddonPackLoader читает items.json и регистрирует
+     * конкретные Minecraft Item ID.
+     *
+     * Важно:
+     *
+     * items.json теперь является источником уникальных registry ID.
+     * Armor JSON больше не используется как Item ID.
      */
     @SubscribeEvent
     public static void onItemRegister(RegisterEvent event) {
-
-        if (!event.getRegistryKey().equals(ForgeRegistries.ITEMS.getRegistryKey())) {
+        if (!event.getRegistryKey().equals(
+                ForgeRegistries.ITEMS.getRegistryKey()
+        )) {
             return;
         }
 
@@ -116,9 +124,10 @@ public class ItemRegistry {
         /*
          * Старые встроенные предметы оставляем.
          *
-         * Они нужны для совместимости со старой системой
-         * и существующими ItemStack.
+         * Они являются частью самого мода и не относятся
+         * к новой динамической системе armor pack items.json.
          */
+
         CUSTOM_HELMET = ITEMS.register(
                 "tk_hm",
                 () -> new CustomGeoArmorItem(
@@ -153,7 +162,9 @@ public class ItemRegistry {
 
         TAB_ICON = ITEMS.register(
                 "tab_icon",
-                () -> new Item(new Item.Properties())
+                () -> new Item(
+                        new Item.Properties()
+                )
         );
 
         PLATE_ARMOR = ITEMS.register(
